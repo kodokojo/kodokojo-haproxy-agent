@@ -7,12 +7,13 @@ import io.kodokojo.ha.config.properties.*;
 import io.kodokojo.ha.config.properties.provider.*;
 import org.apache.commons.io.IOUtils;
 
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.LinkedList;
 import java.util.Properties;
 
 public class PropertyModule extends AbstractModule {
+    public static final String VERSION_PROPERTIES = "version.properties";
     private final String[] args;
 
     public PropertyModule(String[] args) {
@@ -40,7 +41,7 @@ public class PropertyModule extends AbstractModule {
 
         Properties properties = new Properties();
         try {
-            FileInputStream inputStream = new FileInputStream("version.properties");
+            InputStream inputStream = getClass().getClassLoader().getResourceAsStream(VERSION_PROPERTIES);
             properties.load(inputStream);
 
             PropertiesValueProvider propertiesValueProvider = new PropertiesValueProvider(properties);

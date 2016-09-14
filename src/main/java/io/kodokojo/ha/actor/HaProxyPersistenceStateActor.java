@@ -12,10 +12,12 @@ import io.kodokojo.ha.config.properties.ApplicationConfig;
 import io.kodokojo.ha.config.properties.ZookeeperConfig;
 import io.kodokojo.ha.model.Endpoint;
 import io.kodokojo.ha.model.Service;
+import org.apache.commons.io.IOUtils;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Set;
 
 import static akka.event.Logging.getLogger;
@@ -75,7 +77,11 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
             }
             stat = zooKeeper.exists(KODOKOJO_SSL, watcher);
             if (stat == null) {
-                LOGGER.warning("Not SSL certificate provided.");
+                LOGGER.warning("Not SSL certificate provided. Try to use a default ssl certificate.");
+                InputStream inputStream = getClass().getClassLoader().getResourceAsStream("ssl/server.pem");
+                sslCertificat = IOUtils.toString(inputStream);
+                org.apache.commons.io.IOUtils.closeQuietly(inputStream);
+                zooKeeper.create(KODOKOJO_SSL, sslCertificat.getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } else {
                 byte[] data = zooKeeper.getData(KODOKOJO_SSL, watcher, stat);
                 sslCertificat = new String(data);

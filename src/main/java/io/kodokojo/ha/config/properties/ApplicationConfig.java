@@ -2,7 +2,7 @@ package io.kodokojo.ha.config.properties;
 
 public interface ApplicationConfig extends PropertyConfig {
 
-    @Key(value = "env", defaultValue = "env")
+    @Key(value = "app.env", defaultValue = "defaultenv")
     String env();
 
     @Key(value = "mock.haproxy", defaultValue = "false")

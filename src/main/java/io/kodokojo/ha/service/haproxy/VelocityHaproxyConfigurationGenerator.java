@@ -7,12 +7,16 @@ import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import org.apache.velocity.runtime.RuntimeConstants;
 import org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.StringWriter;
 import java.util.Properties;
 import java.util.Set;
 
 public class VelocityHaproxyConfigurationGenerator implements HaproxyConfigurationGenerator {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(VelocityHaproxyConfigurationGenerator.class);
 
     private static final Properties VE_PROPERTIES = new Properties();
 
@@ -28,6 +32,9 @@ public class VelocityHaproxyConfigurationGenerator implements HaproxyConfigurati
 
     @Override
     public String generateConfiguration(Set<Endpoint> endpoints, Set<Service> services) {
+        if (endpoints == null) {
+            throw new IllegalArgumentException("endpoints must be defined.");
+        }
         VelocityEngine ve = new VelocityEngine();
         ve.init(VE_PROPERTIES);
 
@@ -40,6 +47,7 @@ public class VelocityHaproxyConfigurationGenerator implements HaproxyConfigurati
         context.put("initialTcpPort", 15000);
         StringWriter sw = new StringWriter();
         template.merge(context, sw);
-        return sw.toString();
+        String res = sw.toString();
+        return res;
     }
 }

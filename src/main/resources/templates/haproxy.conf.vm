@@ -1,17 +1,17 @@
-#macro(aclHostServiceHTTP $projectName $serviceName)##
-  acl host_${projectName}_${serviceName} hdr_beg(host) -i ${serviceName}-${projectName}
+#macro(aclHostServiceHTTP $endpointName $serviceName)##
+  acl host_${endpointName}_${serviceName} hdr_beg(host) -i ${serviceName}-${endpointName}
 #end
 ##
-#macro(frontServiceHTTP $projectName $serviceName)##
-  use_backend ${projectName}-${serviceName}-cluster-http if host_${projectName}_${serviceName}
+#macro(frontServiceHTTP $endpointName $serviceName)##
+  use_backend ${endpointName}-${serviceName}-cluster-http if host_${endpointName}_${serviceName}
 ##
 #end##
-#macro(frontServiceWS $projectName $serviceName)##
-  use_backend ${projectName}-${serviceName}-cluster-ws if host_${projectName}_${serviceName} hdr_connection_upgrade hdr_upgrade_websocket
+#macro(frontServiceWS $endpointName $serviceName)##
+  use_backend ${endpointName}-${serviceName}-cluster-ws if host_${endpointName}_${serviceName} hdr_connection_upgrade hdr_upgrade_websocket
 ##
 #end##
-#macro(backendServiceHTTPS $projectName $serviceName $services)##
-backend ${projectName}-${serviceName}-cluster-http
+#macro(backendServiceHTTPS $endpointName $serviceName $services)##
+backend ${endpointName}-${serviceName}-cluster-http
   mode    http
   redirect scheme https if !{ ssl_fc }
   balance leastconn
@@ -19,13 +19,13 @@ backend ${projectName}-${serviceName}-cluster-http
 #foreach($service in $services)##
 #if($service.getPortDefinition().getType() == "HTTPS" || $service.getPortDefinition().getType() == "HTTP")##
 #set($index = $index+1)##
-  server ${projectName}-${serviceName}-http-${index} ${service.getHost()}:${service.getPort()} check
+  server ${endpointName}-${serviceName}-http-${index} ${service.getHost()}:${service.getPort()} check
 #end##
 #end##
 
 #end##
-#macro(backendServiceWSS $projectName $serviceName $services)##
-backend ${projectName}-${serviceName}-cluster-wss
+#macro(backendServiceWSS $endpointName $serviceName $services)##
+backend ${endpointName}-${serviceName}-cluster-wss
   balance roundrobin
   # websocket protocol validation
   acl hdr_connection_upgrade hdr(Connection)                 -i upgrade
@@ -38,31 +38,31 @@ backend ${projectName}-${serviceName}-cluster-wss
 #foreach($service in $services)##
 #if($service.getPortDefinition().getType() == "WSS")##
 #set($index = $index+1)##
-  server ${projectName}-${serviceName}-wss-${index} ${service.getHost()}:${service.getPort()} maxconn 30000 weight 10 cookie ${projectName}-${serviceName}-wss-${index} check
+  server ${endpointName}-${serviceName}-wss-${index} ${service.getHost()}:${service.getPort()} maxconn 30000 weight 10 cookie ${endpointName}-${serviceName}-wss-${index} check
 #end##
 #end##
 
 #end##
-#macro(frontServiceSSH $projectName $serviceName $portIndex)##
+#macro(frontServiceSSH $endpointName $serviceName $portIndex)##
 #set($sshPort = $portIndex + $initialSshPort)##
-frontend ${projectName}-${serviceName}-ssh-in
+frontend ${endpointName}-${serviceName}-ssh-in
   bind    *:${sshPort}
-  default_backend ${projectName}-${serviceName}-cluster-ssh
+  default_backend ${endpointName}-${serviceName}-cluster-ssh
 #end##
-#macro(frontServiceTCP $projectName $serviceName $tcpPort)##
-frontend ${projectName}-${serviceName}-tcp-in
+#macro(frontServiceTCP $endpointName $serviceName $tcpPort)##
+frontend ${endpointName}-${serviceName}-tcp-in
   bind    *:${tcpPort}
-  default_backend ${projectName}-${serviceName}-cluster-tcp
+  default_backend ${endpointName}-${serviceName}-cluster-tcp
 #end##
 ##
-#macro(backendServiceTCP $type $projectName $serviceName $services)##
-backend ${projectName}-${serviceName}-cluster-${type}
+#macro(backendServiceTCP $type $endpointName $serviceName $services)##
+backend ${endpointName}-${serviceName}-cluster-${type}
   mode    tcp
 #set($index = 0)##
 #foreach($service in $services)##
 #if($service.getPortDefinition().getType() == $type.toUpperCase())##
 #set($index = $index+1)##
-  server ${projectName}-${serviceName}-${type}-${index} ${service.getHost()}:${service.getPort()} check port ${service.getPort()}
+  server ${endpointName}-${serviceName}-${type}-${index} ${service.getHost()}:${service.getPort()} check port ${service.getPort()}
 #end##
 #end##
 
@@ -211,7 +211,7 @@ frontend http-in
   log     global
   mode    http
   bind    *:80
-  reqadd X-Forwarded-Proto: \ http
+  reqadd X-Forwarded-Proto:\ http
 
 #foreach($endpoint in $endpoints)##
 #aclProjectHTTP($endpoint)##
@@ -233,9 +233,6 @@ frontend https-in
   option forwardfor
   option http-server-close
 
-  stats enable
-  stats auth admin:admin
-  stats uri /stats
 ##  --- ACL DECLARARTION
 
   acl hdr_connection_upgrade hdr(Connection)  -i upgrade
@@ -272,6 +269,16 @@ frontend https-in
 #foreach($endpoint in $endpoints)##
 #frontProjectTCP($endpoint)##
 #end##
+
+listen stats
+  mode http
+  bind  *:1983
+  stats enable
+  ##stats hide-version
+  stats realm Haproxy\ Statistics
+  stats uri /
+  stats show-node
+  stats auth admin:admin
 
 # ------- Backend
 

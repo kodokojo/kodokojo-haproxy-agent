@@ -305,10 +305,10 @@
                         </goals>
                     </execution>
                 </executions>
-                <configuration>
+                <!--configuration>
                     <doCheck>true</doCheck>
                     <doUpdate>true</doUpdate>
-                </configuration>
+                </configuration-->
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

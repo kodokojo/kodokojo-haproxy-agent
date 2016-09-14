@@ -1,7 +1,6 @@
 package io.kodokojo.ha.service.haproxy;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,10 +27,9 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
 
     private static final String USR_LOCAL_SBIN_HAPROXY = "/usr/sbin/haproxy";
 
-    private static final String UPDATE_CONFIGURATION_CMD_FORMAT = USR_LOCAL_SBIN_HAPROXY + "-D -f " + CONFIGURATION_PATH + " -p " + PID_PATH + " -sf %s";
+    private static final String[] UPDATE_NEW_CONFIGURATION_CMD_A = {"-D", "-f", CONFIGURATION_PATH, "-p", PID_PATH, "-sf"};
 
     private static final String[] VALIDATE_NEW_CONFIGURATION_CMD_A = {"-f ", NEW_CONFIGURATION_PATH, "-c"};
-
 
 
     public DefaultHaproxyUpdater() {
@@ -55,10 +53,10 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
             writeCertificates(sslCertificates);
 
             Process process = executeCommand(VALIDATE_NEW_CONFIGURATION_CMD_A);
-            boolean res = (process != null && process.exitValue() == 0);
+            boolean res = (process != null && process.exitValue() == 139);
             if (res) {
                 LOGGER.info("Haproxy configuration file '{}' validated.", NEW_CONFIGURATION_PATH);
-            } else if (process != null){
+            } else if (process != null) {
                 String errOutput = IOUtils.toString(process.getErrorStream());
                 String stdOutput = IOUtils.toString(process.getInputStream());
 
@@ -87,18 +85,29 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
             IOUtils.write(configurationFileContent, output);
             IOUtils.closeQuietly(output);
             writeCertificates(sslCertificates);
+            File pidFile = new File(PID_PATH);
+            if (!pidFile.exists()) {
+                pidFile.getParentFile().mkdirs();
+                pidFile.createNewFile();
+            }
             InputStream pidInputStream = new FileInputStream(PID_PATH);
-            String pid = IOUtils.toString(pidInputStream);
+            String pid = IOUtils.toString(pidInputStream).replace("\\n", "");
             IOUtils.closeQuietly(pidInputStream);
 
-            String commandline = String.format(UPDATE_CONFIGURATION_CMD_FORMAT, pid);
-            Process process = executeCommand(new String[]{USR_LOCAL_SBIN_HAPROXY, commandline});
-            boolean res = (process != null && process.exitValue() == 0);
+            List<String> cmd = new ArrayList<>(Arrays.asList(UPDATE_NEW_CONFIGURATION_CMD_A));
+            cmd.add(pid);
+            Process process = executeCommand(cmd.toArray(new String[cmd.size()]));
+            boolean res = (process != null && process.exitValue() == 139);
             if (res) {
                 LOGGER.info("Haproxy configuration file '{}' updated.", CERTIFICATES_PATH);
-            } else if (process != null){
-                String stdOutput = IOUtils.toString(process.getErrorStream());
-                LOGGER.warn("Fail to reload Haproxy configuration with command '{}':\n{}", commandline, stdOutput);
+            } else if (process != null) {
+                String errOutput = IOUtils.toString(process.getErrorStream());
+                String stdOutput = IOUtils.toString(process.getInputStream());
+
+                LOGGER.warn("Fail to update Haproxy configuration with command '{} {}':\n{}Err:\nStd:{}", USR_LOCAL_SBIN_HAPROXY, StringUtils.join(cmd, " "), errOutput, stdOutput);
+                FileInputStream configInput = new FileInputStream(NEW_CONFIGURATION_PATH);
+                LOGGER.warn("'{}' content :\n{}", NEW_CONFIGURATION_PATH, IOUtils.toString(configInput));
+                IOUtils.closeQuietly(configInput);
             }
             return res;
         } catch (IOException e) {
@@ -118,13 +127,11 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
         try {
             process = runtime.exec(commandLine.toArray(new String[commandLine.size()]));
             int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                String errorOutput = IOUtils.toString(process.getErrorStream());
-                LOGGER.warn("Command line '{}' return code {} :\n{}", USR_LOCAL_SBIN_HAPROXY + " " +args, exitCode, errorOutput);
+            if (exitCode != 0 || exitCode != 139) {
+                LOGGER.warn("Command line '{}' return code {}.", USR_LOCAL_SBIN_HAPROXY + " " + StringUtils.join(args, " "), exitCode);
             }
         } catch (IOException e) {
             LOGGER.error("Unable to run command line '{}'.", args);
-
         } catch (InterruptedException e) {
             LOGGER.error("Command line process stopped by thread interruption.", e);
             Thread.currentThread().interrupt();
@@ -138,8 +145,9 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
         if (!sslDir.exists()) {
             sslDir.mkdirs();
         }
-
+        LOGGER.debug("Write certificate {}.", certificates.size());
         for (Map.Entry<String, String> entry : certificates.entrySet()) {
+            LOGGER.debug("Write certificate {}.", CERTIFICATES_PATH + entry.getKey());
             try {
                 FileOutputStream outputStream = new FileOutputStream(CERTIFICATES_PATH + entry.getKey(), false);
                 IOUtils.write(entry.getValue(), outputStream);
@@ -153,7 +161,7 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
     private void checkOrCreate(String path) {
         File file = new File(path);
         LOGGER.debug("Check file '{}' exist ", path);
-        if (!file.exists() ) {
+        if (!file.exists()) {
             LOGGER.debug("File '{}' not exist.", path);
             File parentFile = file.getParentFile();
             LOGGER.debug("Try to create dir '{}'.", parentFile.getAbsolutePath());
