@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 import static org.apache.commons.lang.StringUtils.isBlank;
 
@@ -71,7 +72,7 @@ public class MarathonConfigValueProvider extends AbstarctStringPropertyValueProv
                 Stat exists = zooKeeper.exists(LEADER_PATH, this);
                 if (exists != null) {
                     List<String> members = zooKeeper.getChildren(LEADER_PATH, this);
-                    String res = members.stream().findFirst().map(leader -> {
+                    Optional<String> res = members.stream().findFirst().map(leader -> {
                         String path = LEADER_PATH + "/" + leader;
                         try {
                             Stat memberExist = zooKeeper.exists(path, this);
@@ -85,8 +86,9 @@ public class MarathonConfigValueProvider extends AbstarctStringPropertyValueProv
                             LOGGER.error("Unable to extract leader url from node member '{}' : {}", path, e);
                         }
                         return null;
-                    }).get();
-                    return "http://" + res;
+                    });
+                    String url = res.isPresent() ? res.get() : "localhost";
+                    return "http://" + url;
                 }
             } catch (KeeperException | InterruptedException e) {
                 LOGGER.error("Unable to check if node '{}' exist : {}", LEADER_PATH, e);

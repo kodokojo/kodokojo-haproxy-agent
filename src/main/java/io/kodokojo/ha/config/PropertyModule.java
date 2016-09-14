@@ -5,8 +5,12 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import io.kodokojo.ha.config.properties.*;
 import io.kodokojo.ha.config.properties.provider.*;
+import org.apache.commons.io.IOUtils;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.LinkedList;
+import java.util.Properties;
 
 public class PropertyModule extends AbstractModule {
     private final String[] args;
@@ -34,6 +38,18 @@ public class PropertyModule extends AbstractModule {
             valueProviders.add(javaArgumentPropertyValueProvider);
         }
 
+        Properties properties = new Properties();
+        try {
+            FileInputStream inputStream = new FileInputStream("version.properties");
+            properties.load(inputStream);
+
+            PropertiesValueProvider propertiesValueProvider = new PropertiesValueProvider(properties);
+            valueProviders.add(propertiesValueProvider);
+            IOUtils.closeQuietly(inputStream);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         SystemEnvValueProvider systemEnvValueProvider = new SystemEnvValueProvider();
         valueProviders.add(systemEnvValueProvider);
 
@@ -57,6 +73,12 @@ public class PropertyModule extends AbstractModule {
         MarathonConfig config = createConfig(MarathonConfig.class, marathonConfigValueProvider);
         marathonConfigValueProvider.setMarathonConfig(config);
         return config;
+    }
+
+    @Provides
+    @Singleton
+    VersionConfig provideVersionConfig(PropertyValueProvider valueProvider) {
+        return createConfig(VersionConfig.class, valueProvider);
     }
 
     @Provides

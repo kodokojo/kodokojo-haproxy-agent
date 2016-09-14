@@ -3,7 +3,12 @@ package io.kodokojo.ha.service.zookeeper;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import io.kodokojo.ha.actor.EndpointActor;
+import io.kodokojo.ha.actor.HaProxyPersistenceStateActor;
 import io.kodokojo.ha.actor.ZookeeperEventHandlerActor;
+import io.kodokojo.ha.config.properties.ApplicationConfig;
+import io.kodokojo.ha.config.properties.MarathonConfig;
+import io.kodokojo.ha.model.PortDefinition;
+import io.kodokojo.ha.model.Service;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -14,9 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,6 +36,10 @@ public class ZookeeperMarathonRootStateWatcher implements Watcher {
 
     private final String zookeeperUrl;
 
+    private final ApplicationConfig applicationConfig;
+
+    private final MarathonConfig marathonConfig;
+
     private ZooKeeper zooKeeper;
 
     private final ActorSystem actorSystem;
@@ -40,17 +47,29 @@ public class ZookeeperMarathonRootStateWatcher implements Watcher {
     private final Object monitor = new Object();
 
     @Inject
-    public ZookeeperMarathonRootStateWatcher(String zooKeeperUrl, ActorSystem actorSystem) {
+    public ZookeeperMarathonRootStateWatcher(String zooKeeperUrl, ApplicationConfig applicationConfig, MarathonConfig marathonConfig, ActorSystem actorSystem) {
         if (isBlank(zooKeeperUrl)) {
             throw new IllegalArgumentException("zooKeeperUrl must be defined.");
+        }
+        if (applicationConfig == null) {
+            throw new IllegalArgumentException("applicationConfig must be defined.");
+        }
+        if (marathonConfig == null) {
+            throw new IllegalArgumentException("marathonConfig must be defined.");
         }
         if (actorSystem == null) {
             throw new IllegalArgumentException("actorSystem must be defined.");
         }
         this.zookeeperUrl = zooKeeperUrl;
+        this.applicationConfig = applicationConfig;
+        this.marathonConfig = marathonConfig;
         this.actorSystem = actorSystem;
         this.appAndTasks = new HashSet<>();
-        start();
+        marathonConfig.registerCallback((key, newValue) -> {
+            if ("marathon.url".equals(key) && applicationConfig.exposeMarathon()) {
+                requestMarathonUpdateState();
+            }
+        });
     }
 
     public synchronized void start() {
@@ -58,17 +77,44 @@ public class ZookeeperMarathonRootStateWatcher implements Watcher {
             try {
                 this.zooKeeper = new ZooKeeper(zookeeperUrl, 1000, this);
                 List<String> children = zooKeeper.getChildren("/marathon/state", this);
-                children.forEach(c -> {
-                    try {
-                        zooKeeper.exists(MARATHON_STATE + c, this);
-                    } catch (KeeperException | InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                });
+                children.stream().filter(node -> node.startsWith("task:"))
+                        .forEach(c -> {
+                            try {
+                                String taskPath = MARATHON_STATE + "/" + c;
+                                zooKeeper.exists(taskPath, this);
+                                Matcher matcher = TASK_PATTERN.matcher(taskPath);
+                                if (matcher.matches() && matcher.groupCount() == 1) {
+                                    String endpointServiceName = matcher.group(1);
+                                    LOGGER.info("Handle node {}.", taskPath);
+                                    actorSystem.actorFor(EndpointActor.PATH).tell(new ZookeeperEventHandlerActor.ZookeeperEventMsg(taskPath, endpointServiceName), ActorRef.noSender());
+                                }
+                            } catch (KeeperException | InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        });
             } catch (IOException | InterruptedException | KeeperException e) {
                 LOGGER.error("Unable to initiate Zookeeper state.", e);
                 throw new RuntimeException("Unable to initiate Zookeeper state.", e);
             }
+        }
+        requestMarathonUpdateState();
+        LOGGER.info("Haproxy-agent started.");
+    }
+
+    private void requestMarathonUpdateState() {
+        if (applicationConfig.exposeMarathon()) {
+            String url = marathonConfig.url();
+            Matcher matcher = Pattern.compile("^http://(.*):(.*)$").matcher(url);
+            if (matcher.matches()) {
+                Set<Service> services = new HashSet<>();
+                Map<String, String> labels = new HashMap<>();
+                PortDefinition portDefinition = new PortDefinition(PortDefinition.Protocol.TCP, PortDefinition.Type.HTTPS, 8080, 8080, 0, labels);
+                services.add(new Service("marathon", matcher.group(1), Integer.parseInt(matcher.group(2)), portDefinition));
+                ActorRef akkaEndpoint = actorSystem.actorFor(EndpointActor.PATH);
+                LOGGER.info("Update Marathon access requested.");
+                akkaEndpoint.tell(new HaProxyPersistenceStateActor.ServiceMayUpdateMsg("marathon", services), ActorRef.noSender());
+            }
+
         }
     }
 
@@ -158,7 +204,7 @@ public class ZookeeperMarathonRootStateWatcher implements Watcher {
             } else {
                 LOGGER.info("Receive a {} Zookeeper service node {}.", event.getType() == Event.EventType.NodeCreated ? "CREATION" : "UPDATE", servicePath);
             }
-            actorSystem.actorFor(EndpointActor.PATH).tell(new ZookeeperEventHandlerActor.ZookeeperEventMsg(event, matcher.group(1)), ActorRef.noSender());
+            actorSystem.actorFor(EndpointActor.PATH).tell(new ZookeeperEventHandlerActor.ZookeeperEventMsg(event.getPath(), matcher.group(1)), ActorRef.noSender());
         } else if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Service path {} not match regExp '{}'", servicePath, TASK_PATTERN.pattern());
         }

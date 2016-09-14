@@ -210,7 +210,7 @@ defaults
 frontend http-in
   log     global
   mode    http
-  bind *: 80
+  bind    *:80
   reqadd X-Forwarded-Proto: \ http
 
 #foreach($endpoint in $endpoints)##
@@ -224,7 +224,7 @@ frontend http-in
 frontend https-in
   log     global
   mode    http
-  bind *: 443 ssl crt #sslCertPath($endpoints)##
+  bind    *:443 ssl crt #sslCertPath($endpoints)##
 
   reqadd X-Forwarded-Proto:\ https
 

@@ -7,7 +7,12 @@
     <groupId>io.kodokojo</groupId>
     <artifactId>haproxy-agent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-
+    <scm>
+        <url>https://github.com/kodokojo/kodokojo-haproxy-agent</url>
+        <connection>scm:git:git://github.com/kodokojo/kodokojo-haproxy-agent.git</connection>
+        <developerConnection>scm:git:git@github.com:kodokojo/kodokojo-haproxy-agent.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
@@ -15,6 +20,9 @@
         <initialEndpoint.reporting.outputEncoding>UTF-8</initialEndpoint.reporting.outputEncoding>
 
         <akka.version>2.4.9</akka.version>
+
+        <shortRevisionLength>6</shortRevisionLength>
+
     </properties>
 
     <dependencies>
@@ -286,6 +294,23 @@
         </resources>
         <plugins>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>buildnumber-maven-plugin</artifactId>
+                <version>1.4</version>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>create</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <doCheck>true</doCheck>
+                    <doUpdate>true</doUpdate>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
                 <version>2.4</version>
@@ -422,7 +447,7 @@
                             </filters>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>io.kodokojo.Launcher</mainClass>
+                                    <mainClass>io.kodokojo.ha.Launcher</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>

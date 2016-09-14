@@ -58,7 +58,7 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
         LOGGER.info("try to connect to zookeeper url {}", zookeeperConfig.url());
         try {
             zooKeeper = new ZooKeeper(zookeeperConfig.url(), 1000, event -> {
-            },false);
+            }, false);
             watcher = new ZookeeperWatcher();
             Stat stat = zooKeeper.exists(KODOKOJO_CONFIG, watcher);
             if (stat == null) {
@@ -67,7 +67,8 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
                     zooKeeper.create("/kodokojo", "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                     zooKeeper.create(KODOKOJO_SERVICES, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 }
-                zooKeeper.create(KODOKOJO_CONFIG, ("{\"env\":\" " + applicationConfig.env() + "\"}").getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                envName = applicationConfig.env();
+                zooKeeper.create(KODOKOJO_CONFIG, ("{\"env\":\"" + applicationConfig.env() + "\"}").getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } else {
                 byte[] data = zooKeeper.getData(KODOKOJO_CONFIG, watcher, stat);
                 extractConfigFromData(data);
@@ -94,33 +95,34 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
                 })
                 .match(ServiceMayUpdateMsg.class, msg -> {
                     String[] split = msg.appId.split("_");
+                    String endPointName = envName;
+                    String serviceName = msg.appId;
                     if (split.length == 2) {
-                        String projectName = split[0];
-                        String serviceName = split[1];
-                        String path = KODOKOJO_SERVICES + "/" + projectName;
-                        Stat stat = zooKeeper.exists(path, watcher);
-                        if (stat == null) {
-                            int portIndex = generateNewPortIndex();
-                            Endpoint endpoint = new Endpoint(projectName, portIndex, msg.services, sslCertificat);
-                            byte[] data = serialize(endpoint);
-                            zooKeeper.create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
-                            getContext().actorFor(EndpointActor.PATH).tell(new HaProxyConfigurationStateActor.ProjectCreateMsg(msg, endpoint), self());
-
-                        } else {
-                            byte[] data = zooKeeper.getData(path, watcher, stat);
-                            Endpoint initialEndpoint = deserialize(Endpoint.class, data);
-
-
-                            initialEndpoint.getServices().clear();
-                            initialEndpoint.getServices().addAll(msg.services);
-                            byte[] dataToSave = serialize(initialEndpoint);
-                            zooKeeper.setData(path, dataToSave, stat.getVersion());
-                            getContext().actorFor(EndpointActor.PATH).tell(new HaProxyConfigurationStateActor.ProjectUpdateMsg(msg, initialEndpoint), self());
-                        }
-                    } else {
-                        //  Not valid project id, maybe a exotic service.
+                        endPointName = split[0];
+                        serviceName = split[1];
                     }
+                    String path = KODOKOJO_SERVICES + "/" + endPointName;
+                    Stat stat = zooKeeper.exists(path, watcher);
+                    if (stat == null) {
+                        int portIndex = generateNewPortIndex();
+                        Endpoint endpoint = new Endpoint(endPointName, portIndex, msg.services, sslCertificat);
+                        byte[] data = serialize(endpoint);
+                        zooKeeper.create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+                        getContext().actorFor(EndpointActor.PATH).tell(new HaProxyConfigurationStateActor.ProjectCreateMsg(msg, endpoint), self());
+
+                    } else {
+                        byte[] data = zooKeeper.getData(path, watcher, stat);
+                        Endpoint initialEndpoint = deserialize(Endpoint.class, data);
+
+
+                        initialEndpoint.getServices().clear();
+                        initialEndpoint.getServices().addAll(msg.services);
+                        byte[] dataToSave = serialize(initialEndpoint);
+                        zooKeeper.setData(path, dataToSave, stat.getVersion());
+                        getContext().actorFor(EndpointActor.PATH).tell(new HaProxyConfigurationStateActor.ProjectUpdateMsg(msg, initialEndpoint), self());
+                    }
+
                 })
                 .matchAny(this::unhandled).build());
     }
@@ -130,10 +132,10 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
             Stat stat = zooKeeper.exists(KODOKOJO_PORT_INDEX, watcher);
             Integer port = 1;
             if (stat == null) {
-                zooKeeper.create(KODOKOJO_PORT_INDEX, port.toString().getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE,CreateMode.PERSISTENT);
+                zooKeeper.create(KODOKOJO_PORT_INDEX, port.toString().getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } else {
                 byte[] data = zooKeeper.getData(KODOKOJO_PORT_INDEX, watcher, stat);
-                int version = stat.getVersion() + 1;
+                int version = stat.getVersion();
                 port = Integer.parseInt(new String(data));
                 port++;
                 zooKeeper.setData(KODOKOJO_PORT_INDEX, port.toString().getBytes(), version);
@@ -161,7 +163,7 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
         String configStr = new String(data);
         JsonParser parser = new JsonParser();
         JsonObject json = (JsonObject) parser.parse(configStr);
-        envName = json.getAsJsonPrimitive("env").getAsString();
+        envName = json.getAsJsonPrimitive("env").getAsString().trim();
     }
 
     public static class ServiceMayUpdateMsg {

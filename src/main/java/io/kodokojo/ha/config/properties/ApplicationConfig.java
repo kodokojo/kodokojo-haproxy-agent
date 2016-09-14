@@ -7,4 +7,7 @@ public interface ApplicationConfig extends PropertyConfig {
 
     @Key(value = "mock.haproxy", defaultValue = "false")
     Boolean mockHaproxy();
+
+    @Key(value = "expose.marathon", defaultValue = "true")
+    Boolean exposeMarathon();
 }

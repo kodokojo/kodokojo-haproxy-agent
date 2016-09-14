@@ -37,9 +37,9 @@ public class ServiceModule extends AbstractModule {
 
     @Provides
     @Singleton
-    ZookeeperMarathonRootStateWatcher provideZookeeperMarathonRootStateWatcher(ZookeeperConfig zookeeperConfig, ActorSystem actorSystem) {
+    ZookeeperMarathonRootStateWatcher provideZookeeperMarathonRootStateWatcher(ZookeeperConfig zookeeperConfig,ApplicationConfig applicationConfig, MarathonConfig marathonConfig, ActorSystem actorSystem) {
 
-        return new ZookeeperMarathonRootStateWatcher(zookeeperConfig.url(), actorSystem);
+        return new ZookeeperMarathonRootStateWatcher(zookeeperConfig.url(),applicationConfig, marathonConfig, actorSystem);
     }
 
     @Provides
