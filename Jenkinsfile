@@ -4,7 +4,8 @@ node() {
         checkout scm
         def version = version()
         def commit = commitSha1()
-        slackSend channel: '#dev', color: '#6CBDEC', message: "*Starting * build job ${env.JOB_NAME} ${env.BUILD_NUMBER} from branch *${env.BRANCH_NAME}* (<${env.BUILD_URL}|Open>)."
+        def commitMessage = commitMessage()
+        slackSend channel: '#dev', color: '#6CBDEC', message: "*Starting * build job ${env.JOB_NAME} ${env.BUILD_NUMBER} from branch *${env.BRANCH_NAME}* (<${env.BUILD_URL}|Open>).\n~Commit message :~ ${commitMessage}"
         sh 'mvn -B install'
         if (currentBuild.result != 'FAILURE') {
             slackSend channel: '#dev', color: 'good', message: "Building job ${env.JOB_NAME} in version $version from branch *${env.BRANCH_NAME}* on commit ${commit} \n Job ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) *SUCCESS*."
@@ -26,4 +27,11 @@ def commitSha1() {
     def commit = readFile('commit').trim()
     sh 'rm commit'
     commit.substring(0,6)
+}
+
+def commitMessage() {
+    sh 'git log --format=%B -n 1 HEAD > commitMessage'
+    def commitMessage = readFile('commitMessage')
+    sh 'rm commitMessage'
+    commitMessage
 }
