@@ -4,7 +4,7 @@ node() {
         checkout scm
         def version = version()
         def commit = commitSha1()
-        slackSend channel: '#dev', color: 'good', message: "Build job ${JOB_NAME} ${env.BUILD_NUMBER} from branch *${GIT_BRANCH}* starting (<${env.BUILD_URL}|Open>)
+        slackSend channel: '#dev', color: 'good', message: "Build job ${JOB_NAME} ${env.BUILD_NUMBER} from branch *${GIT_BRANCH}* starting (<${env.BUILD_URL}|Open>)"
         sh 'mvn -B install'
         if (currentBuild.result != 'FAILURE') {
             slackSend channel: '#dev', color: 'good', message: "Building version $version from branch *${GIT_BRANCH}* on commit ${commit} \n Job ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) *SUCCESS*"
