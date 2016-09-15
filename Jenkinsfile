@@ -1,5 +1,5 @@
 node() {
-    stage 'Building haproxy-agent JAR'
+    stage 'Building haproxy-agent running JAR'
     docker.image('maven:3.3.3-jdk-8').inside {
         checkout scm
         def version = version()
