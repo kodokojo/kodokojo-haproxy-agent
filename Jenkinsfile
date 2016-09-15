@@ -1,9 +1,10 @@
 node() {
     stage 'Building haproxy-agent JAR'
     docker.image('maven:3.3.3-jdk-8').inside {
-        scm checkout
+        checkout scm
         def version = version()
         def commit = commitSha1()
+        sh "echo Build $version from commit $commit"
         sh 'mvn -B install'
     }
 }
