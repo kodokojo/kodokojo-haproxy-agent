@@ -4,14 +4,14 @@ node() {
         checkout scm
         def version = version()
         def commit = commitSha1()
-        slackSend channel: '#dev', color: 'good', message: "Build job ${JOB_NAME} ${env.BUILD_NUMBER} from branch *${GIT_BRANCH}* starting (<${env.BUILD_URL}|Open>)"
+        slackSend channel: '#dev', color: 'good', message: "Build job ${env.JOB_NAME} ${env.BUILD_NUMBER} from branch *${env.GIT_BRANCH}* starting (<${env.BUILD_URL}|Open>)"
         sh 'mvn -B install'
         if (currentBuild.result != 'FAILURE') {
-            slackSend channel: '#dev', color: 'good', message: "Building version $version from branch *${GIT_BRANCH}* on commit ${commit} \n Job ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) *SUCCESS*"
+            slackSend channel: '#dev', color: 'good', message: "Building version $version from branch *${env.GIT_BRANCH}* on commit ${commit} \n Job ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) *SUCCESS*"
         } else {
             step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/-*.xml'])
             step([$class: 'ArtifactArchiver', artifacts: '**/target/*.jar', fingerprint: true])
-            slackSend channel: '#dev', color: 'danger', message: "Building version $version from branch *${GIT_BRANCH}* on commit ${commit} \n Job ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) *FAILED*"
+            slackSend channel: '#dev', color: 'danger', message: "Building version $version from branch *${env.GIT_BRANCH}* on commit ${commit} \n Job ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) *FAILED*"
         }
     }
 }
