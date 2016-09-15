@@ -1,4 +1,8 @@
 node() {
+<<<<<<< ec520e280d9b14f0c887938c68434887c877c76f
+=======
+    stage 'Building haproxy-agent running JAR'
+>>>>>>> Change state label in Jenkinsfile
     docker.image('maven:3.3.3-jdk-8').inside {
         checkout scm
         def version = version()
@@ -27,6 +31,7 @@ def commitSha1() {
     sh 'git rev-parse HEAD > commit'
     def commit = readFile('commit').trim()
     sh 'rm commit'
+<<<<<<< ec520e280d9b14f0c887938c68434887c877c76f
     commit.substring(0,6)
 }
 
@@ -35,4 +40,7 @@ def commitMessage() {
     def commitMessage = readFile('commitMessage')
     sh 'rm commitMessage'
     commitMessage
+=======
+    commit
+>>>>>>> Change state label in Jenkinsfile
 }
