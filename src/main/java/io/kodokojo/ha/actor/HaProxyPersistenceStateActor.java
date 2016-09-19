@@ -12,6 +12,7 @@ import io.kodokojo.ha.config.properties.ApplicationConfig;
 import io.kodokojo.ha.config.properties.ZookeeperConfig;
 import io.kodokojo.ha.model.Endpoint;
 import io.kodokojo.ha.model.Service;
+import org.apache.commons.codec.binary.StringUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
@@ -62,18 +63,23 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
             zooKeeper = new ZooKeeper(zookeeperConfig.url(), 1000, event -> {
             }, false);
             watcher = new ZookeeperWatcher();
+            envName = applicationConfig.env();
             Stat stat = zooKeeper.exists(KODOKOJO_CONFIG, watcher);
             if (stat == null) {
                 stat = zooKeeper.exists("/kodokojo", watcher);
                 if (stat == null) {
                     zooKeeper.create("/kodokojo", "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                    zooKeeper.create(KODOKOJO_SERVICES, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 }
-                envName = applicationConfig.env();
+
+
                 zooKeeper.create(KODOKOJO_CONFIG, ("{\"env\":\"" + applicationConfig.env() + "\"}").getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             } else {
                 byte[] data = zooKeeper.getData(KODOKOJO_CONFIG, watcher, stat);
                 extractConfigFromData(data);
+            }
+            stat = zooKeeper.exists(KODOKOJO_SERVICES, watcher);
+            if (stat == null) {
+                zooKeeper.create(KODOKOJO_SERVICES, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             }
             stat = zooKeeper.exists(KODOKOJO_SSL, watcher);
             if (stat == null) {
@@ -169,7 +175,9 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
         String configStr = new String(data);
         JsonParser parser = new JsonParser();
         JsonObject json = (JsonObject) parser.parse(configStr);
-        envName = json.getAsJsonPrimitive("env").getAsString().trim();
+        if (org.apache.commons.lang.StringUtils.isBlank(envName) || "defaultenv".equals(envName)) {
+            envName = json.getAsJsonPrimitive("env").getAsString().trim();
+        }
     }
 
     public static class ServiceMayUpdateMsg {

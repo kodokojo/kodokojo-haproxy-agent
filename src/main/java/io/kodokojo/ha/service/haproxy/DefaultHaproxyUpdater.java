@@ -53,7 +53,7 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
             writeCertificates(sslCertificates);
 
             Process process = executeCommand(VALIDATE_NEW_CONFIGURATION_CMD_A);
-            boolean res = (process != null && process.exitValue() == 139);
+            boolean res = (process != null && (process.exitValue() == 139 || process.exitValue() == 0));
             if (res) {
                 LOGGER.info("Haproxy configuration file '{}' validated.", NEW_CONFIGURATION_PATH);
             } else if (process != null) {
@@ -97,7 +97,7 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
             List<String> cmd = new ArrayList<>(Arrays.asList(UPDATE_NEW_CONFIGURATION_CMD_A));
             cmd.add(pid);
             Process process = executeCommand(cmd.toArray(new String[cmd.size()]));
-            boolean res = (process != null && process.exitValue() == 139);
+            boolean res = (process != null && (process.exitValue() == 139 || process.exitValue() == 0));
             if (res) {
                 LOGGER.info("Haproxy configuration file '{}' updated.", CERTIFICATES_PATH);
             } else if (process != null) {
@@ -127,7 +127,7 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
         try {
             process = runtime.exec(commandLine.toArray(new String[commandLine.size()]));
             int exitCode = process.waitFor();
-            if (exitCode != 0 || exitCode != 139) {
+            if (exitCode != 0 && exitCode != 139) {
                 LOGGER.warn("Command line '{}' return code {}.", USR_LOCAL_SBIN_HAPROXY + " " + StringUtils.join(args, " "), exitCode);
             }
         } catch (IOException e) {

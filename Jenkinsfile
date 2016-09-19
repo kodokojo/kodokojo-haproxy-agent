@@ -1,18 +1,19 @@
 node() {
-    stage 'Building haproxy-agent running JAR'
-    docker.image('maven:3.3.3-jdk-8').inside {
-        checkout scm
-        def version = version()
-        def commit = commitSha1()
-        def commitMessage = commitMessage()
-        slackSend channel: '#dev', color: '#6CBDEC', message: "*Starting * build job ${env.JOB_NAME} ${env.BUILD_NUMBER} from branch *${env.BRANCH_NAME}* (<${env.BUILD_URL}|Open>).\nCommit message :\n```${commitMessage}```"
-        sh 'mvn -B install'
-        if (currentBuild.result != 'FAILURE') {
-            slackSend channel: '#dev', color: 'good', message: "Building job ${env.JOB_NAME} in version $version from branch *${env.BRANCH_NAME}* on commit ${commit} \n Job ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) *SUCCESS*."
-            step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/*.xml'])
-            step([$class: 'ArtifactArchiver', artifacts: '**/target/*.jar', fingerprint: true])
-        } else {
-            slackSend channel: '#dev', color: 'danger', message: "Building job ${env.JOB_NAME} in version $version from branch *${env.BRANCH_NAME}* on commit ${commit} \n Job ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) *FAILED*."
+    stage('Building haproxy-agent running JAR') {
+        docker.image('maven:3.3.3-jdk-8').inside {
+            checkout scm
+            def version = version()
+            def commit = commitSha1()
+            def commitMessage = commitMessage()
+            slackSend channel: '#dev', color: '#6CBDEC', message: "*Starting * build job ${env.JOB_NAME} ${env.BUILD_NUMBER} from branch *${env.BRANCH_NAME}* (<${env.BUILD_URL}|Open>).\nCommit message :\n```${commitMessage}```"
+            sh 'mvn -B install'
+            if (currentBuild.result != 'FAILURE') {
+                slackSend channel: '#dev', color: 'good', message: "Building job ${env.JOB_NAME} in version $version from branch *${env.BRANCH_NAME}* on commit ${commit} \n Job ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) *SUCCESS*."
+                step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/*.xml'])
+                step([$class: 'ArtifactArchiver', artifacts: '**/target/*.jar', fingerprint: true])
+            } else {
+                slackSend channel: '#dev', color: 'danger', message: "Building job ${env.JOB_NAME} in version $version from branch *${env.BRANCH_NAME}* on commit ${commit} \n Job ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) *FAILED*."
+            }
         }
     }
 }
