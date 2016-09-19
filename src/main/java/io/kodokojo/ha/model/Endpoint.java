@@ -59,22 +59,58 @@ public class Endpoint {
 
     public Set<String> getHTTPServiceNames() {
         Set<String> res = new HashSet<>();
-        res.addAll(getServiceNames("HTTP"));
-        res.addAll(getServiceNames("HTTPS"));
+        res.addAll(getServiceNames("HTTP", null));
+        res.addAll(getServiceNames("WS", null));
         return res;
     }
 
-    public Set<String> getServiceNames(String typeStr) {
+    public Set<String> getHTTPSServiceNames() {
+        Set<String> res = getHTTPServiceNames();
+        res.addAll(getServiceNames("HTTPS", null));
+        res.addAll(getServiceNames("WSS", null));
+        return res;
+    }
+
+    public Set<String> getOnlyHTTPSServiceNames() {
+        Set<String> res = getServiceNames("HTTP", null);
+        res.addAll(getServiceNames("HTTPS", null));
+        return res;
+    }
+
+    public Set<String> getServiceNameByType(String typeStr) {
+        return getServiceNames(typeStr, null);
+    }
+
+    public Set<String> getServiceNames(String typeStr, String name) {
         PortDefinition.Type typeCriteria = PortDefinition.Type.valueOf(typeStr.trim().toUpperCase());
         Set<String> res = services.stream()
                 .filter(s -> s.getPortDefinition().getProtocol().equals(PortDefinition.Protocol.TCP))
                 .filter(s -> s.getPortDefinition().getType() == typeCriteria)
+                .filter(s -> StringUtils.isBlank(name) || name.equals(s.getName()))
                 .map(s -> s.getName()).collect(Collectors.toSet());
         Set<String> addByLabel = services.stream()
                 .filter(s -> s.getPortDefinition().getProtocol().equals(PortDefinition.Protocol.TCP))
                 .filter(s -> s.getPortDefinition().getType() == typeCriteria)
                 .filter(s -> s.getPortDefinition().getLabels().containsKey("frontName"))
+                .filter(s -> StringUtils.isBlank(name) || name.equals(s.getPortDefinition().getLabels().get("frontName")))
                 .map(s -> s.getPortDefinition().getLabels().get("frontName"))
+                .collect(Collectors.toSet());
+        res.addAll(addByLabel);
+        return res;
+    }
+
+    public Set<Service> getServicesByTypeAndNames(String typeStr, String name) {
+        PortDefinition.Type typeCriteria = PortDefinition.Type.valueOf(typeStr.trim().toUpperCase());
+        Set<Service> res = services.stream()
+                .filter(s -> s.getPortDefinition().getProtocol().equals(PortDefinition.Protocol.TCP))
+                .filter(s -> s.getPortDefinition().getType() == typeCriteria)
+                .filter(s -> StringUtils.isBlank(name) || name.equals(s.getName()))
+                .collect(Collectors.toSet());
+        Set<Service> addByLabel = services.stream()
+                .filter(s -> s.getPortDefinition().getProtocol().equals(PortDefinition.Protocol.TCP))
+                .filter(s -> s.getPortDefinition().getType() == typeCriteria)
+                .filter(s -> s.getPortDefinition().getLabels().containsKey("frontName"))
+                .filter(s -> StringUtils.isBlank(name) || name.equals(s.getPortDefinition().getLabels().get("frontName")))
                 .collect(Collectors.toSet());
         res.addAll(addByLabel);
         return res;

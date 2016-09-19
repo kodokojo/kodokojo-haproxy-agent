@@ -6,6 +6,7 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import io.kodokojo.ha.config.properties.ApplicationConfig;
 import io.kodokojo.ha.config.properties.MarathonConfig;
+import io.kodokojo.ha.config.properties.MesosConfig;
 import io.kodokojo.ha.config.properties.ZookeeperConfig;
 import io.kodokojo.ha.service.haproxy.DefaultHaproxyUpdater;
 import io.kodokojo.ha.service.haproxy.HaproxyConfigurationGenerator;
@@ -37,15 +38,15 @@ public class ServiceModule extends AbstractModule {
 
     @Provides
     @Singleton
-    ZookeeperMarathonRootStateWatcher provideZookeeperMarathonRootStateWatcher(ZookeeperConfig zookeeperConfig,ApplicationConfig applicationConfig, MarathonConfig marathonConfig, ActorSystem actorSystem) {
+    ZookeeperMarathonRootStateWatcher provideZookeeperMarathonRootStateWatcher(ZookeeperConfig zookeeperConfig, ApplicationConfig applicationConfig, MarathonConfig marathonConfig, MesosConfig mesosConfig,  ActorSystem actorSystem) {
 
-        return new ZookeeperMarathonRootStateWatcher(zookeeperConfig.url(),applicationConfig, marathonConfig, actorSystem);
+        return new ZookeeperMarathonRootStateWatcher(zookeeperConfig.url(),applicationConfig, marathonConfig, mesosConfig,  actorSystem);
     }
 
     @Provides
     @Singleton
-    HaproxyConfigurationGenerator provideHaproxyConfigurationGenerator() {
-        return new VelocityHaproxyConfigurationGenerator();
+    HaproxyConfigurationGenerator provideHaproxyConfigurationGenerator(ApplicationConfig applicationConfig) {
+        return new VelocityHaproxyConfigurationGenerator(applicationConfig);
     }
 
     @Provides

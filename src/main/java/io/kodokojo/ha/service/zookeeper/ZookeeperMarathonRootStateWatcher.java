@@ -7,8 +7,10 @@ import io.kodokojo.ha.actor.HaProxyPersistenceStateActor;
 import io.kodokojo.ha.actor.ZookeeperEventHandlerActor;
 import io.kodokojo.ha.config.properties.ApplicationConfig;
 import io.kodokojo.ha.config.properties.MarathonConfig;
+import io.kodokojo.ha.config.properties.MesosConfig;
 import io.kodokojo.ha.model.PortDefinition;
 import io.kodokojo.ha.model.Service;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -40,6 +42,8 @@ public class ZookeeperMarathonRootStateWatcher implements Watcher {
 
     private final MarathonConfig marathonConfig;
 
+    private final MesosConfig mesosConfig;
+
     private ZooKeeper zooKeeper;
 
     private final ActorSystem actorSystem;
@@ -47,7 +51,7 @@ public class ZookeeperMarathonRootStateWatcher implements Watcher {
     private final Object monitor = new Object();
 
     @Inject
-    public ZookeeperMarathonRootStateWatcher(String zooKeeperUrl, ApplicationConfig applicationConfig, MarathonConfig marathonConfig, ActorSystem actorSystem) {
+    public ZookeeperMarathonRootStateWatcher(String zooKeeperUrl, ApplicationConfig applicationConfig, MarathonConfig marathonConfig, MesosConfig mesosConfig, ActorSystem actorSystem) {
         if (isBlank(zooKeeperUrl)) {
             throw new IllegalArgumentException("zooKeeperUrl must be defined.");
         }
@@ -57,17 +61,26 @@ public class ZookeeperMarathonRootStateWatcher implements Watcher {
         if (marathonConfig == null) {
             throw new IllegalArgumentException("marathonConfig must be defined.");
         }
+        if (mesosConfig == null) {
+            throw new IllegalArgumentException("mesosConfig must be defined.");
+        }
         if (actorSystem == null) {
             throw new IllegalArgumentException("actorSystem must be defined.");
         }
         this.zookeeperUrl = zooKeeperUrl;
         this.applicationConfig = applicationConfig;
         this.marathonConfig = marathonConfig;
+        this.mesosConfig = mesosConfig;
         this.actorSystem = actorSystem;
         this.appAndTasks = new HashSet<>();
         marathonConfig.registerCallback((key, newValue) -> {
             if ("marathon.url".equals(key) && applicationConfig.exposeMarathon()) {
-                requestMarathonUpdateState();
+                requestEnvServiceUpdate();
+            }
+        });
+        mesosConfig.registerCallback((key, newValue) -> {
+            if ("mesos.url".equals(key) && applicationConfig.exposeMarathon()) {
+                requestEnvServiceUpdate();
             }
         });
     }
@@ -97,25 +110,55 @@ public class ZookeeperMarathonRootStateWatcher implements Watcher {
                 throw new RuntimeException("Unable to initiate Zookeeper state.", e);
             }
         }
-        requestMarathonUpdateState();
+        requestEnvServiceUpdate();
         LOGGER.info("Haproxy-agent started.");
     }
 
-    private void requestMarathonUpdateState() {
+    private void requestEnvServiceUpdate(){
+        Set<Service> services = new HashSet<>();
+        Service marathon = requestMarathonUpdateState();
+        if (marathon != null) {
+            services.add(marathon);
+        }
+        Service mesos = requestMesosUpdateState();
+        if (mesos != null) {
+            services.add(mesos);
+        }
+        if (CollectionUtils.isNotEmpty(services)) {
+            ActorRef akkaEndpoint = actorSystem.actorFor(EndpointActor.PATH);
+            LOGGER.info("Update {} access requested.", services);
+            akkaEndpoint.tell(new HaProxyPersistenceStateActor.ServiceMayUpdateMsg("env", services), ActorRef.noSender());
+        }
+    }
+
+    private Service requestMarathonUpdateState() {
         if (applicationConfig.exposeMarathon()) {
             String url = marathonConfig.url();
             Matcher matcher = Pattern.compile("^http://(.*):(.*)$").matcher(url);
             if (matcher.matches()) {
-                Set<Service> services = new HashSet<>();
+
                 Map<String, String> labels = new HashMap<>();
                 PortDefinition portDefinition = new PortDefinition(PortDefinition.Protocol.TCP, PortDefinition.Type.HTTPS, 8080, 8080, 0, labels);
-                services.add(new Service("marathon", matcher.group(1), Integer.parseInt(matcher.group(2)), portDefinition));
-                ActorRef akkaEndpoint = actorSystem.actorFor(EndpointActor.PATH);
-                LOGGER.info("Update Marathon access requested.");
-                akkaEndpoint.tell(new HaProxyPersistenceStateActor.ServiceMayUpdateMsg("marathon", services), ActorRef.noSender());
+                return new Service("marathon", matcher.group(1), Integer.parseInt(matcher.group(2)), portDefinition);
+
+            }
+        }
+        return null;
+    }
+
+    private Service requestMesosUpdateState() {
+        if (applicationConfig.exposeMesos()) {
+            String url = mesosConfig.url();
+            LOGGER.debug("Update Mesos state to url {}", url);
+            Matcher matcher = Pattern.compile("^(.*):(.*)$").matcher(url);
+            if (matcher.matches()) {
+                Map<String, String> labels = new HashMap<>();
+                PortDefinition portDefinition = new PortDefinition(PortDefinition.Protocol.TCP, PortDefinition.Type.HTTPS, 5050, 5050, 0, labels);
+                return new Service("mesos", matcher.group(1), Integer.parseInt(matcher.group(2)), portDefinition);
             }
 
         }
+        return null;
     }
 
     @Override

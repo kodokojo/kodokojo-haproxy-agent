@@ -1,5 +1,9 @@
 #macro(aclHostServiceHTTP $endpointName $serviceName)##
+#if($endpointName == "kodokojo" && ($serviceName == "back" || $serviceName == "ui"))##
+  acl host_${endpointName}_${serviceName} hdr_beg(host) -i ${envName}
+#else##
   acl host_${endpointName}_${serviceName} hdr_beg(host) -i ${serviceName}-${endpointName}
+#end##
 #end
 ##
 #macro(frontServiceHTTP $endpointName $serviceName)##
@@ -7,7 +11,7 @@
 ##
 #end##
 #macro(frontServiceWS $endpointName $serviceName)##
-  use_backend ${endpointName}-${serviceName}-cluster-ws if host_${endpointName}_${serviceName} hdr_connection_upgrade hdr_upgrade_websocket
+  use_backend ${endpointName}-${serviceName}-cluster-wss if host_${endpointName}_${serviceName} hdr_connection_upgrade hdr_upgrade_websocket
 ##
 #end##
 #macro(backendServiceHTTPS $endpointName $serviceName $services)##
@@ -74,13 +78,13 @@ backend ${endpointName}-${serviceName}-cluster-${type}
 #end##
 #end##
 #macro(aclProjectHTTPS $endpoint)##
-#foreach($serviceName in $endpoint.getHTTPServiceNames())##
+#foreach($serviceName in $endpoint.getHTTPSServiceNames())##
 #aclHostServiceHTTP($endpoint.getName() $serviceName)##
 #end##
 #end##
 #macro(aclProjectWSS $endpoint)##
 #set($httpsServices = $endpoint.getHTTPServiceNames())##
-#foreach($serviceName in $endpoint.getServiceNames("WSS"))##
+#foreach($serviceName in $endpoint.getServiceNameByType("WSS"))##
 #if(!$httpsServices.contains($serviceName))
 #aclHostServiceHTTP($endpoint.getName() $serviceName)##
 #end
@@ -88,7 +92,7 @@ backend ${endpointName}-${serviceName}-cluster-${type}
 #end##
 #macro(aclProjectSSH $endpoint)##
 #set($httpsServices = $endpoint.getHTTPServiceNames())##
-#foreach($serviceName in $endpoint.getServiceNames("SSH"))##
+#foreach($serviceName in $endpoint.getServiceNameByType("SSH"))##
 #if(!$httpsServices.contains($serviceName))
 #aclHostServiceHTTP($endpoint.getName() $serviceName)##
 #end
@@ -96,7 +100,7 @@ backend ${endpointName}-${serviceName}-cluster-${type}
 #end##
 #macro(aclProjectOther $endpoint)##
 #set($httpsServices = $endpoint.getHTTPServiceNames())##
-#foreach($serviceName in $endpoint.getServiceNames("OTHER"))##
+#foreach($serviceName in $endpoint.getServiceNameByType("OTHER"))##
 #if(!$httpsServices.contains($serviceName))
 #aclHostServiceHTTP($endpoint.getName() $serviceName)##
 #end
@@ -104,63 +108,77 @@ backend ${endpointName}-${serviceName}-cluster-${type}
 #end##
 #macro(frontProjectHTTP $endpoint)##
 # ${endpoint.getName()} HTTP configuration
-#foreach($serviceName in $endpoint.getHTTPServiceNames())##
+#foreach($serviceName in $endpoint.getServiceNames("HTTPS", null ))##
 #frontServiceHTTP($endpoint.getName() $serviceName)##
 #end##
 #end##
 #macro(frontProjectHTTPS $endpoint)##
 # ${endpoint.getName()} HTTPS configuration
-#foreach($serviceName in $endpoint.getServiceNames("HTTPS"))##
+#foreach($serviceName in $endpoint.getOnlyHTTPSServiceNames())##
 #frontServiceHTTP($endpoint.getName() $serviceName)##
 #end##
 #end##
 #macro(backendProjectHTTPS $endpoint)##
 # ${endpoint.getName()} HTTPS backend configuration
-#foreach($serviceName in $endpoint.getServiceNames("HTTPS"))##
-#backendServiceHTTPS($endpoint.getName() $serviceName $endpoint.getServices())##
+#set($serviceNames  = $endpoint.getServiceNameByType("HTTPS"))##
+#foreach($serviceNameType in $serviceNames)##
+#foreach($serviceName in $endpoint.getServiceNames("HTTPS", $serviceNameType))##
+#set($services = $endpoint.getServicesByTypeAndNames("HTTPS", $serviceNameType ))##
+#backendServiceHTTPS($endpoint.getName() $serviceName $services)##
+#end##
 #end##
 #end##
 ##
 #macro(backendProjectWSS $endpoint)##
-# ${endpoint.getName()} WSS backend configuration
-#foreach($serviceName in $endpoint.getServiceNames("WSS"))##
-#backendServiceWSS($endpoint.getName() $serviceName $endpoint.getServices())##
+#set($serviceNames  = $endpoint.getServiceNameByType("WSS"))##
+#foreach($serviceNameType in $serviceNames)##
+#foreach($serviceName in $endpoint.getServiceNames("WSS", $serviceNameType))##
+# ${endpoint.getName()} ${serviceName} WSS backend configuration
+#set($services = $endpoint.getServicesByTypeAndNames("WSS", $serviceNameType ))##
+#backendServiceWSS($endpoint.getName() $serviceName $services)##
+#end##
 #end##
 #end##
 ##
 #macro(frontProjectWSS $endpoint)##
 # ${endpoint.getName()} WSS configuration
-#foreach($serviceName in $endpoint.getServiceNames("WSS"))##
+#foreach($serviceName in $endpoint.getServiceNameByType("WSS"))##
 #frontServiceWS($endpoint.getName() $serviceName)##
 #end##
 #end##
 #macro(frontProjectWS $endpoint)##
 # ${endpoint.getName()} WS configuration
-#foreach($serviceName in $endpoint.getServiceNames("WSS"))##
+#foreach($serviceName in $endpoint.getServiceNames("WSS", $endpoint.getName()))##
 #frontServiceWS($endpoint.getName() $serviceName)##
 #end##
-#foreach($serviceName in $endpoint.getServiceNames("WS"))##
+#foreach($serviceName in $endpoint.getServiceNames("WS", $endpoint.getName()))##
 #frontServiceWS($endpoint.getName() $serviceName)##
 #end##
 #end##
 ##
 #macro(backendProjectTCP $type $endpoint)##
 # ${endpoint.getName()} ${type} backend configuration
-#foreach($serviceName in $endpoint.getServiceNames($type))##
-#backendServiceTCP($type $endpoint.getName() $serviceName $endpoint.getServices())##
+#set($serviceNames  = $endpoint.getServiceNameByType($type))##
+#foreach($serviceNameType in $serviceNames)##
+#foreach($serviceName in $endpoint.getServiceNames($type, $serviceNameType))##
+#set($services = $endpoint.getServicesByTypeAndNames($type, $serviceNameType ))##
+#foreach($serviceName in $endpoint.getServiceNames($type, $endpoint.getName()))##
+#backendServiceTCP($type $endpoint.getName() $serviceName $services)##
+#end##
+#end##
 #end##
 #end##
 ##
 #macro(frontProjectSSH $endpoint)##
 # ${endpoint.getName()} SSH configuration
-#foreach($serviceName in $endpoint.getServiceNames("SSH"))##
+#foreach($serviceName in $endpoint.getServiceNames("SSH", $endpoint.getName()))##
 #frontServiceSSH($endpoint.getName() $serviceName $endpoint.getPortIndex())##
 #end##
 #end##
 ##
 #macro(frontProjectTCP $endpoint)##
 # ${endpoint.getName()} TCP configuration
-#foreach($serviceName in $endpoint.getServiceNames("OTHER"))##
+#foreach($serviceName in $endpoint.getServiceNames("OTHER", $endpoint.getName()))##
 #foreach($service in $endpoint.getServices())##
 #if($service.getName() == $serviceName && $service.getPortDefinition().getType() == "OTHER")##
 #frontServiceTCP($endpoint.getName() $serviceName $service.getPortDefinition().getServicePort())##
@@ -173,8 +191,8 @@ backend ${endpointName}-${serviceName}-cluster-${type}
 #foreach($endpoint in $endpoints)
 #if($endpoint.getCertificate() != "")
 #set($sslCert = "")
-#foreach($serviceName in $endpoint.getServiceNames("HTTPS"))
-#set($sslCert = "${sslCert}/usr/local/etc/haproxy/ssl/${endpoint.getName()}-${serviceName}.pem ")
+#foreach($serviceName in $endpoint.getHTTPSServiceNames())
+#set($sslCert = "${sslCert} crt /usr/local/etc/haproxy/ssl/${endpoint.getName()}-${serviceName}.pem ")
 #end
 ${sslCert}##
 #end
@@ -214,7 +232,7 @@ frontend http-in
   reqadd X-Forwarded-Proto:\ http
 
 #foreach($endpoint in $endpoints)##
-#aclProjectHTTP($endpoint)##
+#aclProjectHTTPS($endpoint)##
 #end##
 
 #foreach($endpoint in $endpoints)##
@@ -224,7 +242,7 @@ frontend http-in
 frontend https-in
   log     global
   mode    http
-  bind    *:443 ssl crt #sslCertPath($endpoints)##
+  bind    *:443 ssl #sslCertPath($endpoints)##
 
   reqadd X-Forwarded-Proto:\ https
 
@@ -282,18 +300,18 @@ listen stats
 
 # ------- Backend
 
-#foreach($endpoint in $endpoints)##
-#backendProjectHTTPS($endpoint)##
-#end##
+ #foreach($endpoint in $endpoints)##
+ #backendProjectHTTPS($endpoint)##
+ #end##
 
-#foreach($endpoint in $endpoints)##
-#backendProjectWSS($endpoint)##
-#end##
+ #foreach($endpoint in $endpoints)##
+ #backendProjectWSS($endpoint)##
+ #end##
 
-#foreach($endpoint in $endpoints)##
-#backendProjectTCP("ssh" $endpoint)##
-#end##
+ #foreach($endpoint in $endpoints)##
+ #backendProjectTCP("ssh" $endpoint)##
+ #end##
 
-#foreach($endpoint in $endpoints)##
-#backendProjectTCP("other" $endpoint)##
-#end##
+ #foreach($endpoint in $endpoints)##
+ #backendProjectTCP("other" $endpoint)##
+ #end##

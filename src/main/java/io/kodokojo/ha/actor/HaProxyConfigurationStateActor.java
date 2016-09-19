@@ -82,8 +82,15 @@ public class HaProxyConfigurationStateActor extends AbstractActor {
                 LOGGER.debug("Changed detected on following service of endpoint {} : {}", msg.initialEndpoint.getName(), StringUtils.join(serviceChanged, ","));
             }
         }
+        Set<Service> services = msg.initialMsg.getServices();
+        Set<String> serviceNames = services.stream().map(service -> service.getName()).collect(Collectors.toSet());
         endpoints.remove(previousEndpoint);
-        Endpoint newEndpoint = new Endpoint(previousEndpoint.getName(), previousEndpoint.getPortIndex(), msg.initialMsg.getServices(), previousEndpoint.getCertificate());
+        previousEndpoint.getServices().stream()
+                .filter(s -> !serviceNames.contains(s.getName()))
+                .forEach(services::add);
+
+
+        Endpoint newEndpoint = new Endpoint(previousEndpoint.getName(), previousEndpoint.getPortIndex(), services, previousEndpoint.getCertificate());
         endpoints.add(newEndpoint);
         requestHaProxyUpdate(haproxyConfigurationGenerator);
     }
@@ -92,8 +99,11 @@ public class HaProxyConfigurationStateActor extends AbstractActor {
         String configuration = haproxyConfigurationGenerator.generateConfiguration(endpoints, services);
         Map<String, String> certificates = new HashedMap<>();
         endpoints.stream().filter(p -> StringUtils.isNotBlank(p.getCertificate()))
-                .forEach(p -> p.getServiceNames(PortDefinition.Type.HTTPS.toString())
-                        .stream().forEach(s -> certificates.put(p.getName() + "-" + s + ".pem", p.getCertificate())));
+                .forEach(p -> {
+                    Set<String> services = p.getServiceNames(PortDefinition.Type.HTTPS.toString(), null);
+                    services.addAll(p.getServiceNames(PortDefinition.Type.WSS.toString(), null));
+                    services.stream().forEach(s -> certificates.put(p.getName() + "-" + s + ".pem", p.getCertificate()));
+                });
         getContext().actorFor(EndpointActor.PATH).tell(new HaProxyUpdaterActor.UpdateHaProxyConfigurationMsg(sender(), configuration, certificates), self());
     }
 

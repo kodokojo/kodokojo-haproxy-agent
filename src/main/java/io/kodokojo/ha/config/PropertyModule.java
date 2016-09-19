@@ -78,6 +78,15 @@ public class PropertyModule extends AbstractModule {
 
     @Provides
     @Singleton
+    MesosConfig provideMesosConfig(ZookeeperConfig zookeeperConfig, PropertyValueProvider valueProvider) {
+        MesosConfigValueProvider mesosConfigValueProvider = new MesosConfigValueProvider(zookeeperConfig.url(), valueProvider);
+        MesosConfig config = createConfig(MesosConfig.class, mesosConfigValueProvider);
+        mesosConfigValueProvider.setMesosConfig(config);
+        return config;
+    }
+
+    @Provides
+    @Singleton
     VersionConfig provideVersionConfig(PropertyValueProvider valueProvider) {
         return createConfig(VersionConfig.class, valueProvider);
     }

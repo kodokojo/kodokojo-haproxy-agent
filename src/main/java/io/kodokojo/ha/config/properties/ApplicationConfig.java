@@ -10,4 +10,7 @@ public interface ApplicationConfig extends PropertyConfig {
 
     @Key(value = "expose.marathon", defaultValue = "true")
     Boolean exposeMarathon();
+
+    @Key(value = "expose.mesos", defaultValue = "true")
+    Boolean exposeMesos();
 }

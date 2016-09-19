@@ -1,5 +1,6 @@
 package io.kodokojo.ha.service.haproxy;
 
+import io.kodokojo.ha.config.properties.ApplicationConfig;
 import io.kodokojo.ha.model.Endpoint;
 import io.kodokojo.ha.model.Service;
 import org.apache.velocity.Template;
@@ -26,8 +27,13 @@ public class VelocityHaproxyConfigurationGenerator implements HaproxyConfigurati
         VE_PROPERTIES.setProperty("runtime.log.logsystem.class", "org.apache.velocity.runtime.log.NullLogChute");
     }
 
-    public VelocityHaproxyConfigurationGenerator() {
+    private final ApplicationConfig applicationConfig;
 
+    public VelocityHaproxyConfigurationGenerator(ApplicationConfig applicationConfig) {
+        if (applicationConfig == null) {
+            throw new IllegalArgumentException("applicationConfig must be defined.");
+        }
+        this.applicationConfig = applicationConfig;
     }
 
     @Override
@@ -41,6 +47,7 @@ public class VelocityHaproxyConfigurationGenerator implements HaproxyConfigurati
         Template template = ve.getTemplate("templates/haproxy.conf.vm");
 
         VelocityContext context = new VelocityContext();
+        context.put("envName", applicationConfig.env());
         context.put("endpoints", endpoints);
         context.put("services", services);
         context.put("initialSshPort", 10022);

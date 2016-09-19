@@ -26,18 +26,22 @@ public class ZookeeperWatcherLogger implements Watcher {
 
     public ZookeeperWatcherLogger(String zookeeperUrl) throws IOException, KeeperException, InterruptedException {
         zooKeeper = new ZooKeeper(zookeeperUrl, 1000, this);
-        List<String> children = zooKeeper.getChildren("/marathon/state", this);
+        List<String> children = zooKeeper.getChildren("/mesos", this);
         children.forEach(c -> {
             try {
-                zooKeeper.exists("/marathon/state/" + c, this);
+                System.out.println(c);
+                String path = "/mesos/" + c;
+                Stat exists = zooKeeper.exists(path, this);
+                byte[] data = zooKeeper.getData(path, this, exists);
+                System.out.println(new String(data));
             } catch (KeeperException | InterruptedException e) {
                 e.printStackTrace();
             }
         });
-        Stat stat = zooKeeper.exists("/marathon", this);
+        Stat stat = zooKeeper.exists("/mesos", this);
         if (stat != null) {
 
-            List<String> marathonChildren = zooKeeper.getChildren("/marathon", this);
+            List<String> marathonChildren = zooKeeper.getChildren("/mesos", this);
             marathonChildren.stream().forEach(System.out::println);
             byte[] data = zooKeeper.getData("/marathon/leader", this, stat);
             if (data == null) {
