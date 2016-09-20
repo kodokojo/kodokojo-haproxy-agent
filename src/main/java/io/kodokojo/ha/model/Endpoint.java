@@ -1,5 +1,6 @@
 package io.kodokojo.ha.model;
 
+import com.google.gson.annotations.Expose;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.HashSet;
@@ -10,11 +11,15 @@ import static org.apache.commons.lang.StringUtils.isBlank;
 
 public class Endpoint {
 
+    @Expose
     private String name;
 
+    @Expose
     private int portIndex;
 
+    @Expose
     private Set<Service> services;
+
 
     private final String certificate;
 

@@ -13,6 +13,7 @@ import org.apache.commons.collections4.map.HashedMap;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static akka.event.Logging.getLogger;
@@ -28,44 +29,26 @@ public class HaProxyConfigurationStateActor extends AbstractActor {
         return Props.create(HaProxyConfigurationStateActor.class, haproxyConfigurationGenerator);
     }
 
-    private Set<Endpoint> endpoints;
+    private Map<String, Endpoint> endpoints;
 
     private Set<Service> services;
 
     public HaProxyConfigurationStateActor(HaproxyConfigurationGenerator haproxyConfigurationGenerator) {
-        endpoints = new HashSet<>();
+        endpoints = new HashMap<>();
         services = new HashSet<>();
-        receive(ReceiveBuilder.match(ProjectCreateMsg.class, msg -> {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Receive a endpoint creation message for endpoint '{}'.", msg.endpoint.getName());
-            }
-            if (endpoints.contains(msg.endpoint)) {
-                sender().tell(new ProjectAlreadyExist(msg.endpoint), self());
-            } else {
-                endpoints.add(msg.endpoint);
-                requestHaProxyUpdate(haproxyConfigurationGenerator);
-            }
-        })
+        receive(ReceiveBuilder
                 .match(ProjectUpdateMsg.class, msg -> {
+                    Endpoint endpoint = msg.initialEndpoint;
                     if (LOGGER.isDebugEnabled()) {
-                        LOGGER.debug("Receive a endpoint update request message for endpoint '{}'.", msg.initialEndpoint.getName());
+                        LOGGER.debug("Receive a endpoint update request message for endpoint '{}'.", endpoint.getName());
                     }
-                    if (endpoints.contains(msg.initialEndpoint)) {
-                        LOGGER.debug("Endpoint '{}' already referenced, update her configuration.", msg.initialEndpoint.getName());
-                        updateEndpoint(haproxyConfigurationGenerator, msg, msg.initialEndpoint);
+                    if (endpoints.get(endpoint.getName()) != null) {
+                        endpoint = endpoints.get(endpoint.getName());
+                        LOGGER.debug("Endpoint '{}' already referenced, update her configuration.", endpoint.getName());
                     } else {
-                        if (LOGGER.isDebugEnabled()) {
-                            LOGGER.debug("Receive a endpoint update request message for endpoint '{}', lookup by endpoint name.", msg.initialEndpoint.getName());
-                        }
-                        Optional<Endpoint> projectOptional = endpoints.stream().filter(p -> p.getName().equals(msg.initialEndpoint.getName())).findFirst();
-                        if (projectOptional.isPresent()) {
-                            Endpoint previousEndpoint = projectOptional.get();
-                            updateEndpoint(haproxyConfigurationGenerator, msg, previousEndpoint);
-                        } else {
-                            LOGGER.warning("Endpoint {} not yet exist, convert request to Endpoint creation request.", msg.initialEndpoint.getName());
-                            self().tell(new ProjectCreateMsg(msg.initialMsg, msg.initialEndpoint), sender());
-                        }
+                        endpoints.put(endpoint.getName(), endpoint);
                     }
+                    updateEndpoint(haproxyConfigurationGenerator, msg, endpoint);
                 })
                 .match(HaProxyUpdaterActor.UpdateHaProxyConfigurationResultMsg.class, msg -> {
                     msg.getInitialRequest().getOriginalSender().forward(msg, getContext());
@@ -84,21 +67,24 @@ public class HaProxyConfigurationStateActor extends AbstractActor {
         }
         Set<Service> services = msg.initialMsg.getServices();
         Set<String> serviceNames = services.stream().map(service -> service.getName()).collect(Collectors.toSet());
-        endpoints.remove(previousEndpoint);
+       // endpoints.remove(previousEndpoint);
         previousEndpoint.getServices().stream()
                 .filter(s -> !serviceNames.contains(s.getName()))
                 .forEach(services::add);
 
-
-        Endpoint newEndpoint = new Endpoint(previousEndpoint.getName(), previousEndpoint.getPortIndex(), services, previousEndpoint.getCertificate());
-        endpoints.add(newEndpoint);
+        if (CollectionUtils.isNotEmpty(services)) {
+            Endpoint newEndpoint = new Endpoint(previousEndpoint.getName(), previousEndpoint.getPortIndex(), services, previousEndpoint.getCertificate());
+            endpoints.put(newEndpoint.getName(), newEndpoint);
+        } else {
+            endpoints.remove(previousEndpoint.getName());
+        }
         requestHaProxyUpdate(haproxyConfigurationGenerator);
     }
 
     private void requestHaProxyUpdate(HaproxyConfigurationGenerator haproxyConfigurationGenerator) {
-        String configuration = haproxyConfigurationGenerator.generateConfiguration(endpoints, services);
+        String configuration = haproxyConfigurationGenerator.generateConfiguration(new HashSet<>(endpoints.values()), services);
         Map<String, String> certificates = new HashedMap<>();
-        endpoints.stream().filter(p -> StringUtils.isNotBlank(p.getCertificate()))
+        endpoints.values().stream().filter(p -> StringUtils.isNotBlank(p.getCertificate()))
                 .forEach(p -> {
                     Set<String> services = p.getServiceNames(PortDefinition.Type.HTTPS.toString(), null);
                     services.addAll(p.getServiceNames(PortDefinition.Type.WSS.toString(), null));
@@ -107,23 +93,6 @@ public class HaProxyConfigurationStateActor extends AbstractActor {
         getContext().actorFor(EndpointActor.PATH).tell(new HaProxyUpdaterActor.UpdateHaProxyConfigurationMsg(sender(), configuration, certificates), self());
     }
 
-    public static class ProjectCreateMsg {
-
-        private final HaProxyPersistenceStateActor.ServiceMayUpdateMsg initialMsg;
-
-        private final Endpoint endpoint;
-
-        public ProjectCreateMsg(HaProxyPersistenceStateActor.ServiceMayUpdateMsg msg, Endpoint endpoint) {
-            if (msg == null) {
-                throw new IllegalArgumentException("msg must be defined.");
-            }
-            if (endpoint == null) {
-                throw new IllegalArgumentException("endpoint must be defined.");
-            }
-            initialMsg = msg;
-            this.endpoint = endpoint;
-        }
-    }
 
     public static class ProjectUpdateMsg {
 
@@ -140,20 +109,6 @@ public class HaProxyConfigurationStateActor extends AbstractActor {
             }
             initialMsg = msg;
             this.initialEndpoint = initialEndpoint;
-        }
-    }
-
-
-    public static class ProjectAlreadyExist {
-
-        private final Endpoint endpoint;
-
-        public ProjectAlreadyExist(Endpoint endpoint) {
-            this.endpoint = endpoint;
-        }
-
-        public Endpoint getEndpoint() {
-            return endpoint;
         }
     }
 

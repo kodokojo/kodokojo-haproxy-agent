@@ -121,7 +121,7 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
                         byte[] data = serialize(endpoint);
                         zooKeeper.create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
-                        getContext().actorFor(EndpointActor.PATH).tell(new HaProxyConfigurationStateActor.ProjectCreateMsg(msg, endpoint), self());
+                        getContext().actorFor(EndpointActor.PATH).tell(new HaProxyConfigurationStateActor.ProjectUpdateMsg(msg, endpoint), self());
 
                     } else {
                         byte[] data = zooKeeper.getData(path, watcher, stat);

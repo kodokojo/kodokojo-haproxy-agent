@@ -44,8 +44,6 @@ public class EndpointActor extends AbstractActor {
                 })
                 .match(HaProxyPersistenceStateActor.ServiceMayUpdateMsg.class, msg -> {
                     haproxyPersistenceStateActorRef.forward(msg, getContext());
-                }).match(HaProxyConfigurationStateActor.ProjectCreateMsg.class, msg -> {
-                    haproxyConfigurationStateActorRef.forward(msg, getContext());
                 }).match(HaProxyConfigurationStateActor.ProjectUpdateMsg.class, msg -> {
                     haproxyConfigurationStateActorRef.forward(msg, getContext());
                 }).match(HaProxyUpdaterActor.UpdateHaProxyConfigurationMsg.class, msg -> {

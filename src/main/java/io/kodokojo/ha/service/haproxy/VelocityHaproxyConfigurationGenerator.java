@@ -1,5 +1,7 @@
 package io.kodokojo.ha.service.haproxy;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import io.kodokojo.ha.config.properties.ApplicationConfig;
 import io.kodokojo.ha.model.Endpoint;
 import io.kodokojo.ha.model.Service;
@@ -40,6 +42,12 @@ public class VelocityHaproxyConfigurationGenerator implements HaproxyConfigurati
     public String generateConfiguration(Set<Endpoint> endpoints, Set<Service> services) {
         if (endpoints == null) {
             throw new IllegalArgumentException("endpoints must be defined.");
+        }
+
+        if(LOGGER.isTraceEnabled()) {
+            Gson gson = new GsonBuilder().setPrettyPrinting().excludeFieldsWithoutExposeAnnotation().create();
+            String json = gson.toJson(endpoints);
+            LOGGER.trace("Generate Haproxy configuration from :\n{}", json);
         }
         VelocityEngine ve = new VelocityEngine();
         ve.init(VE_PROPERTIES);

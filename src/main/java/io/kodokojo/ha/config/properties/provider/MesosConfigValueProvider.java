@@ -1,10 +1,12 @@
 package io.kodokojo.ha.config.properties.provider;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.kodokojo.ha.config.properties.MarathonConfig;
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.Response;
 import io.kodokojo.ha.config.properties.MesosConfig;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
@@ -17,7 +19,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 
 import static org.apache.commons.lang.StringUtils.isBlank;
 
@@ -33,6 +34,8 @@ public class MesosConfigValueProvider extends AbstarctStringPropertyValueProvide
 
     private final PropertyValueProvider delegate;
 
+    private OkHttpClient httpClient;
+
     private String leadearNodeName;
 
     private String previousUrl;
@@ -47,6 +50,7 @@ public class MesosConfigValueProvider extends AbstarctStringPropertyValueProvide
             throw new IllegalArgumentException("delegate must be defined.");
         }
         this.delegate = delegate;
+        this.httpClient = new OkHttpClient();
         try {
             zooKeeper = new ZooKeeper(zookeeperUrl, 1000, this);
         } catch (IOException e) {
@@ -79,11 +83,12 @@ public class MesosConfigValueProvider extends AbstarctStringPropertyValueProvide
             try {
                 Stat exists = zooKeeper.exists(MESOS_PATH, this);
                 if (exists != null) {
-                    LOGGER.debug("{} exist.",MESOS_PATH);
+                    LOGGER.debug("{} exist.", MESOS_PATH);
                     List<String> members = zooKeeper.getChildren(MESOS_PATH, this);
-                    String res = members.stream().findFirst().map(leader -> {
+
+                    String res = members.stream().map(leader -> {
                         String path = MESOS_PATH + "/" + leader;
-                        LOGGER.debug("lookup {}", path);
+
                         try {
                             Stat memberExist = zooKeeper.exists(path, this);
                             if (memberExist != null) {
@@ -94,22 +99,48 @@ public class MesosConfigValueProvider extends AbstarctStringPropertyValueProvide
                                 } else {
                                     String json = new String(data);
                                     LOGGER.debug("{} contain:\n{}", path, json);
-                                    return json;
+                                    if (StringUtils.isNotBlank(json)) {
+                                        return json;
+                                    }
                                 }
                             }
                         } catch (KeeperException | InterruptedException e) {
                             LOGGER.error("Unable to extract leader url from node member '{}' : {}", path, e);
                         }
                         return "";
-                    }).get();
+                    }).filter(StringUtils::isNotBlank).sorted(String::compareTo).findFirst()
+                            .get();
                     if (StringUtil.isNotBlank(res)) {
                         JsonParser parser = new JsonParser();
                         JsonObject json = (JsonObject) parser.parse(res);
                         JsonObject address = json.getAsJsonObject("address");
                         String host = address.getAsJsonPrimitive("ip").getAsString();
                         int port = address.getAsJsonPrimitive("port").getAsInt();
+
+                        String url = "http://" + host + ":" + port;
+                        Request request = new Request.Builder().url(url).build();
+                        Response response = null;
+                        try {
+                            response = httpClient.newCall(request).execute();
+                            if (response.code() == 307) {
+                                String mesosUrl = response.header("Location");
+                                if (StringUtils.isBlank(mesosUrl)) {
+                                    LOGGER.error("Unable to define Mesos leader Url.");
+                                } else {
+                                    return mesosUrl;
+                                }
+                            }
+                        } catch (IOException e) {
+                            LOGGER.error("Unable to request Mesos on url {}", url, e);
+                        } finally {
+                            if (response != null) {
+                                IOUtils.closeQuietly(response.body());
+                            }
+                        }
+
+
                         LOGGER.debug("Mesos url defined has {}:{}", host, port);
-                        return host + ":" +port;
+                        return host + ":" + port;
                     }
 
                 } else if (LOGGER.isDebugEnabled()) {

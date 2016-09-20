@@ -1,5 +1,7 @@
 package io.kodokojo.ha.model;
 
+import com.google.gson.annotations.Expose;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,16 +22,22 @@ public class PortDefinition {
         UDP
     }
 
+    @Expose
     private final Protocol protocol;
 
+    @Expose
     private final Type type;
 
+    @Expose
     private final int containerPort;
 
+    @Expose
     private final int hostPort;
 
+    @Expose
     private final int servicePort;
 
+    @Expose
     private final Map<String, String> labels;
 
     public PortDefinition(Protocol protocol, Type type, int containerPort, int hostPort, int servicePort, Map<String, String> labels) {

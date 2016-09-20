@@ -1,15 +1,21 @@
 package io.kodokojo.ha.model;
 
+import com.google.gson.annotations.Expose;
+
 import static org.apache.commons.lang.StringUtils.isBlank;
 
 public class Service {
 
+    @Expose
     private final String name;
 
+    @Expose
     private final String host;
 
+    @Expose
     private final int port;
 
+    @Expose
     private final PortDefinition portDefinition;
 
     public Service(String name, String host, int port, PortDefinition portDefinition) {

@@ -1,5 +1,6 @@
 package io.kodokojo.ha.service.haproxy;
 
+import com.google.gson.Gson;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -147,13 +148,19 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
         }
         LOGGER.debug("Write certificate {}.", certificates.size());
         for (Map.Entry<String, String> entry : certificates.entrySet()) {
-            LOGGER.debug("Write certificate {}.", CERTIFICATES_PATH + entry.getKey());
-            try {
-                FileOutputStream outputStream = new FileOutputStream(CERTIFICATES_PATH + entry.getKey(), false);
-                IOUtils.write(entry.getValue(), outputStream);
-                IOUtils.closeQuietly(outputStream);
-            } catch (IOException e) {
-                LOGGER.error("Unable to write certificate {}: {}", CERTIFICATES_PATH + entry.getKey(), e);
+            String certificatePath = CERTIFICATES_PATH + entry.getKey();
+            File certificateFile = new File(certificatePath);
+            if (certificateFile.exists() && certificateFile.length() > 0) {
+                LOGGER.info("Certificate {} already exist, ignore rewrite.", certificatePath);
+            } else {
+                try {
+                    FileOutputStream outputStream = new FileOutputStream(certificatePath, false);
+                    IOUtils.write(entry.getValue(), outputStream);
+                    LOGGER.debug("Write certificate {}.", certificatePath);
+                    IOUtils.closeQuietly(outputStream);
+                } catch (IOException e) {
+                    LOGGER.error("Unable to write certificate {}: {}", certificatePath, e);
+                }
             }
         }
     }
