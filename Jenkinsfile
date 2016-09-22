@@ -27,7 +27,7 @@ def commitSha1() {
     sh 'git rev-parse HEAD > commit'
     def commit = readFile('commit').trim()
     sh 'rm commit'
-    commit.substring(0,6)
+    commit.substring(0,7)
 }
 
 def commitMessage() {

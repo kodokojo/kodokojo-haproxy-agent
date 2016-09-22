@@ -83,7 +83,7 @@ backend ${endpointName}-${serviceName}-cluster-${type}
 #end##
 #end##
 #macro(aclProjectWSS $endpoint)##
-#set($httpsServices = $endpoint.getHTTPServiceNames())##
+#set($httpsServices = $endpoint.getHTTPSServiceNames())##
 #foreach($serviceName in $endpoint.getServiceNameByType("WSS"))##
 #if(!$httpsServices.contains($serviceName))
 #aclHostServiceHTTP($endpoint.getName() $serviceName)##
@@ -93,9 +93,9 @@ backend ${endpointName}-${serviceName}-cluster-${type}
 #macro(aclProjectSSH $endpoint)##
 #set($httpsServices = $endpoint.getHTTPServiceNames())##
 #foreach($serviceName in $endpoint.getServiceNameByType("SSH"))##
-#if(!$httpsServices.contains($serviceName))
+#if(!$httpsServices.contains($serviceName))##
 #aclHostServiceHTTP($endpoint.getName() $serviceName)##
-#end
+#end##
 #end##
 #end##
 #macro(aclProjectOther $endpoint)##
@@ -148,10 +148,10 @@ backend ${endpointName}-${serviceName}-cluster-${type}
 #end##
 #macro(frontProjectWS $endpoint)##
 # ${endpoint.getName()} WS configuration
-#foreach($serviceName in $endpoint.getServiceNames("WSS", $endpoint.getName()))##
+#foreach($serviceName in $endpoint.getServiceNames("WSS", null))##
 #frontServiceWS($endpoint.getName() $serviceName)##
 #end##
-#foreach($serviceName in $endpoint.getServiceNames("WS", $endpoint.getName()))##
+#foreach($serviceName in $endpoint.getServiceNames("WS", null))##
 #frontServiceWS($endpoint.getName() $serviceName)##
 #end##
 #end##
@@ -160,18 +160,17 @@ backend ${endpointName}-${serviceName}-cluster-${type}
 # ${endpoint.getName()} ${type} backend configuration
 #set($serviceNames  = $endpoint.getServiceNameByType($type))##
 #foreach($serviceNameType in $serviceNames)##
+#  ServiceNameType ${serviceNameType}
 #foreach($serviceName in $endpoint.getServiceNames($type, $serviceNameType))##
 #set($services = $endpoint.getServicesByTypeAndNames($type, $serviceNameType ))##
-#foreach($serviceName in $endpoint.getServiceNames($type, $endpoint.getName()))##
 #backendServiceTCP($type $endpoint.getName() $serviceName $services)##
-#end##
 #end##
 #end##
 #end##
 ##
 #macro(frontProjectSSH $endpoint)##
 # ${endpoint.getName()} SSH configuration
-#foreach($serviceName in $endpoint.getServiceNames("SSH", $endpoint.getName()))##
+#foreach($serviceName in $endpoint.getServiceNames("SSH", null))##
 #frontServiceSSH($endpoint.getName() $serviceName $endpoint.getPortIndex())##
 #end##
 #end##
@@ -309,9 +308,9 @@ listen stats
  #end##
 
  #foreach($endpoint in $endpoints)##
- #backendProjectTCP("ssh" $endpoint)##
+ #backendProjectTCP("SSH" $endpoint)##
  #end##
 
  #foreach($endpoint in $endpoints)##
- #backendProjectTCP("other" $endpoint)##
+ #backendProjectTCP("OTHER" $endpoint)##
  #end##

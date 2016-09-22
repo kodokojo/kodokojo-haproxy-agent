@@ -29,7 +29,7 @@ public class ServiceLookupActor extends AbstractActor {
             String marathonAppId = msg.zookeeperNodeServiceName.replaceAll("_", "/");
             Set<Service> services = marathonServiceLookup.lookup(marathonAppId);
             if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Lookup {} return {}", StringUtils.join(services, ","));
+                LOGGER.debug("Lookup {} return {}",marathonAppId,  StringUtils.join(services, ","));
             }
             sender().tell(new ZookeeperServiceLookupResultMsg(msg, services), self());
            // getContext().stop(self());

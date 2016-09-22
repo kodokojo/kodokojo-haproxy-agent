@@ -92,7 +92,7 @@ public class Endpoint {
                 .filter(s -> s.getPortDefinition().getProtocol().equals(PortDefinition.Protocol.TCP))
                 .filter(s -> s.getPortDefinition().getType() == typeCriteria)
                 .filter(s -> StringUtils.isBlank(name) || name.equals(s.getName()))
-                .map(s -> s.getName()).collect(Collectors.toSet());
+                .map(Service::getName).collect(Collectors.toSet());
         Set<String> addByLabel = services.stream()
                 .filter(s -> s.getPortDefinition().getProtocol().equals(PortDefinition.Protocol.TCP))
                 .filter(s -> s.getPortDefinition().getType() == typeCriteria)
