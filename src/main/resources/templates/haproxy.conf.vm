@@ -206,7 +206,7 @@ global
 defaults
   mode http
   log global
-  option httplog
+  option  httplog
   option  http-server-close
   option  dontlognull
   option  redispatch
