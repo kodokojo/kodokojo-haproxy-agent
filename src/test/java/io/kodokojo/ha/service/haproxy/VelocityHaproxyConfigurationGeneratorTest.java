@@ -1,6 +1,7 @@
 package io.kodokojo.ha.service.haproxy;
 
 import io.kodokojo.ha.config.properties.ApplicationConfig;
+import io.kodokojo.ha.config.properties.RsyslogConfig;
 import io.kodokojo.ha.model.PortDefinition;
 import io.kodokojo.ha.model.Endpoint;
 import io.kodokojo.ha.model.Service;
@@ -33,6 +34,16 @@ public class VelocityHaproxyConfigurationGeneratorTest {
             @Override
             public Boolean exposeMesos() {
                 return null;
+            }
+        }, new RsyslogConfig() {
+            @Override
+            public String host() {
+                return "locahost";
+            }
+
+            @Override
+            public String port() {
+                return "514";
             }
         });
         Set<Endpoint> endpoints = new HashSet<>();
