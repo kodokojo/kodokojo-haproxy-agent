@@ -4,10 +4,7 @@ import akka.actor.ActorSystem;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
-import io.kodokojo.ha.config.properties.ApplicationConfig;
-import io.kodokojo.ha.config.properties.MarathonConfig;
-import io.kodokojo.ha.config.properties.MesosConfig;
-import io.kodokojo.ha.config.properties.ZookeeperConfig;
+import io.kodokojo.ha.config.properties.*;
 import io.kodokojo.ha.service.haproxy.DefaultHaproxyUpdater;
 import io.kodokojo.ha.service.haproxy.HaproxyConfigurationGenerator;
 import io.kodokojo.ha.service.haproxy.HaproxyUpdater;
@@ -45,8 +42,8 @@ public class ServiceModule extends AbstractModule {
 
     @Provides
     @Singleton
-    HaproxyConfigurationGenerator provideHaproxyConfigurationGenerator(ApplicationConfig applicationConfig) {
-        return new VelocityHaproxyConfigurationGenerator(applicationConfig);
+    HaproxyConfigurationGenerator provideHaproxyConfigurationGenerator(ApplicationConfig applicationConfig, RsyslogConfig rsyslogConfig) {
+        return new VelocityHaproxyConfigurationGenerator(applicationConfig, rsyslogConfig);
     }
 
     @Provides

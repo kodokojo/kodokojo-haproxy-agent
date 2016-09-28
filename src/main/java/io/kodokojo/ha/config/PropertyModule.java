@@ -97,6 +97,12 @@ public class PropertyModule extends AbstractModule {
         return createConfig(ZookeeperConfig.class, valueProvider);
     }
 
+    @Provides
+    @Singleton
+    RsyslogConfig provideRsyslogConfig(PropertyValueProvider valueProvider) {
+        return createConfig(RsyslogConfig.class, valueProvider);
+    }
+
     private <T extends PropertyConfig> T createConfig(Class<T> configClass, PropertyValueProvider valueProvider) {
         PropertyResolver resolver = new PropertyResolver(valueProvider);
         return resolver.createProxy(configClass);

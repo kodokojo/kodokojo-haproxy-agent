@@ -50,17 +50,19 @@ backend ${endpointName}-${serviceName}-cluster-wss
 #macro(frontServiceSSH $endpointName $serviceName $portIndex)##
 #set($sshPort = $portIndex + $initialSshPort)##
 frontend ${endpointName}-${serviceName}-ssh-in
+  mode tcp
   bind    *:${sshPort}
   default_backend ${endpointName}-${serviceName}-cluster-ssh
 #end##
 #macro(frontServiceTCP $endpointName $serviceName $tcpPort)##
 frontend ${endpointName}-${serviceName}-tcp-in
+  mode tcp
   bind    *:${tcpPort}
   default_backend ${endpointName}-${serviceName}-cluster-tcp
 #end##
 ##
 #macro(backendServiceTCP $type $endpointName $serviceName $services)##
-backend ${endpointName}-${serviceName}-cluster-${type}
+backend ${endpointName}-${serviceName}-cluster-${type.toLowerCase()}
   mode    tcp
 #set($index = 0)##
 #foreach($service in $services)##
@@ -199,8 +201,7 @@ ${sslCert}##
 #end
 global
   maxconn 4096
-  log 192.168.99.100 local0
-  log 192.168.99.100 local1 info
+  log ${rsyslogHost}:${rsyslogPort} local0
 
 defaults
   mode http

@@ -3,6 +3,7 @@ package io.kodokojo.ha.service.haproxy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.kodokojo.ha.config.properties.ApplicationConfig;
+import io.kodokojo.ha.config.properties.RsyslogConfig;
 import io.kodokojo.ha.model.Endpoint;
 import io.kodokojo.ha.model.Service;
 import org.apache.velocity.Template;
@@ -31,11 +32,17 @@ public class VelocityHaproxyConfigurationGenerator implements HaproxyConfigurati
 
     private final ApplicationConfig applicationConfig;
 
-    public VelocityHaproxyConfigurationGenerator(ApplicationConfig applicationConfig) {
+    private final RsyslogConfig rsyslogConfig;
+
+    public VelocityHaproxyConfigurationGenerator(ApplicationConfig applicationConfig, RsyslogConfig rsyslogConfig) {
         if (applicationConfig == null) {
             throw new IllegalArgumentException("applicationConfig must be defined.");
         }
+        if (rsyslogConfig == null) {
+            throw new IllegalArgumentException("rsyslogConfig must be defined.");
+        }
         this.applicationConfig = applicationConfig;
+        this.rsyslogConfig = rsyslogConfig;
     }
 
     @Override
@@ -55,6 +62,8 @@ public class VelocityHaproxyConfigurationGenerator implements HaproxyConfigurati
         Template template = ve.getTemplate("templates/haproxy.conf.vm");
 
         VelocityContext context = new VelocityContext();
+        context.put("rsyslogHost", rsyslogConfig.host());
+        context.put("rsyslogPort", rsyslogConfig.port());
         context.put("envName", applicationConfig.env());
         context.put("endpoints", endpoints);
         context.put("services", services);
