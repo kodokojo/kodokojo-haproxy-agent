@@ -44,6 +44,8 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
 
     private static final String KODOKOJO_SERVICES = "/kodokojo/services";
 
+    private static final String KODOKOJO_TCP_PORT = "/kodokojo/tcpports";
+
     private final LoggingAdapter LOGGER = getLogger(getContext().system(), this);
 
     private final ZooKeeper zooKeeper;
@@ -81,6 +83,10 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
             if (stat == null) {
                 zooKeeper.create(KODOKOJO_SERVICES, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             }
+            stat = zooKeeper.exists(KODOKOJO_TCP_PORT, watcher);
+            if (stat == null) {
+                zooKeeper.create(KODOKOJO_TCP_PORT, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            }
             stat = zooKeeper.exists(KODOKOJO_SSL, watcher);
             if (stat == null) {
                 LOGGER.warning("Not SSL certificate provided. Try to use a default ssl certificate.");
@@ -98,45 +104,57 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
             throw new RuntimeException("unable to connect to Zookeeper url " + zookeeperConfig.url(), e);
         }
         receive(ReceiveBuilder
-                .match(HaProxyZookeeperEventMsg.class, msg -> {
-                    if (msg.event.getType() == Watcher.Event.EventType.NodeDataChanged && msg.event.getPath().equals(KODOKOJO_CONFIG)) {
-                        Stat stat = zooKeeper.exists(KODOKOJO_CONFIG, watcher);
-                        byte[] data = zooKeeper.getData(KODOKOJO_CONFIG, watcher, stat);
-                        extractConfigFromData(data);
-                    }
-                })
-                .match(ServiceMayUpdateMsg.class, msg -> {
-                    String[] split = msg.appId.split("_");
-                    String endPointName = envName;
-                    String serviceName = msg.appId;
-                    if (split.length == 2) {
-                        endPointName = split[0];
-                        serviceName = split[1];
-                    }
-                    String path = KODOKOJO_SERVICES + "/" + endPointName;
-                    Stat stat = zooKeeper.exists(path, watcher);
-                    if (stat == null) {
-                        int portIndex = generateNewPortIndex();
-                        Endpoint endpoint = new Endpoint(endPointName, portIndex, msg.services, sslCertificat);
-                        byte[] data = serialize(endpoint);
-                        zooKeeper.create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
-                        getContext().actorFor(EndpointActor.PATH).tell(new HaProxyConfigurationStateActor.ProjectUpdateMsg(msg, endpoint), self());
-
-                    } else {
-                        byte[] data = zooKeeper.getData(path, watcher, stat);
-                        Endpoint initialEndpoint = deserialize(Endpoint.class, data);
-
-
-                        initialEndpoint.getServices().clear();
-                        initialEndpoint.getServices().addAll(msg.services);
-                        byte[] dataToSave = serialize(initialEndpoint);
-                        zooKeeper.setData(path, dataToSave, stat.getVersion());
-                        getContext().actorFor(EndpointActor.PATH).tell(new HaProxyConfigurationStateActor.ProjectUpdateMsg(msg, initialEndpoint), self());
-                    }
-
-                })
+                .match(HaProxyZookeeperEventMsg.class, this::onZooleeperEvent)
+                .match(ServiceMayUpdateMsg.class, this::onServiceUpdate)
                 .matchAny(this::unhandled).build());
+    }
+
+    protected void onServiceUpdate(ServiceMayUpdateMsg msg) throws KeeperException, InterruptedException {
+        String[] split = msg.appId.split("_");
+        String endPointName = envName;
+        String serviceName = msg.appId;
+        if (split.length == 2) {
+            endPointName = split[0];
+            serviceName = split[1];
+        }
+        String path = KODOKOJO_TCP_PORT + "/" + endPointName;
+        Stat stat = zooKeeper.exists(path, watcher);
+
+        if (stat == null) {
+            int portIndex = generateNewPortIndex();
+            zooKeeper.create(path, ("" + portIndex).getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        }
+        byte[] portData = zooKeeper.getData(KODOKOJO_PORT_INDEX, watcher, stat);
+        int version = stat.getVersion();
+        int portIndex = Integer.parseInt(new String(portData));
+
+        path = KODOKOJO_SERVICES + "/" + endPointName;
+        stat = zooKeeper.exists(path, watcher);
+        if (stat == null) {
+            Endpoint endpoint = new Endpoint(endPointName, portIndex, msg.services, sslCertificat);
+            byte[] data = serialize(endpoint);
+            zooKeeper.create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+            getContext().actorFor(EndpointActor.PATH).tell(new HaProxyConfigurationStateActor.ProjectUpdateMsg(msg, endpoint), self());
+
+        } else {
+            byte[] data = zooKeeper.getData(path, watcher, stat);
+            Endpoint initialEndpoint = deserialize(Endpoint.class, data);
+
+            initialEndpoint.getServices().clear();
+            initialEndpoint.getServices().addAll(msg.services);
+            byte[] dataToSave = serialize(initialEndpoint);
+            zooKeeper.setData(path, dataToSave, stat.getVersion());
+            getContext().actorFor(EndpointActor.PATH).tell(new HaProxyConfigurationStateActor.ProjectUpdateMsg(msg, initialEndpoint), self());
+        }
+    }
+
+    protected void onZooleeperEvent(HaProxyZookeeperEventMsg msg) throws KeeperException, InterruptedException {
+        if (msg.event.getType() == Watcher.Event.EventType.NodeDataChanged && msg.event.getPath().equals(KODOKOJO_CONFIG)) {
+            Stat stat = zooKeeper.exists(KODOKOJO_CONFIG, watcher);
+            byte[] data = zooKeeper.getData(KODOKOJO_CONFIG, watcher, stat);
+            extractConfigFromData(data);
+        }
     }
 
     protected final int generateNewPortIndex() {

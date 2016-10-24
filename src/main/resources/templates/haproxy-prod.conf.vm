@@ -1,8 +1,11 @@
 #macro(aclHostServiceHTTP $endpointName $serviceName)##
-#if($endpointName == "kodokojo" && ($serviceName == "back" || $serviceName == "ui"))##
-  acl host_${endpointName}_${serviceName} hdr_beg(host) -i ${envName}
+#if($endpointName == "kodokojo" && ($serviceName == "back" || $serviceName == "ui" || $serviceName == "landing"))##
+#if(($serviceName == "back" || $serviceName == "ui"))##
+  acl host_${endpointName}_${serviceName} hdr_beg(host) -i ${envName}.kodokojo.io
+#elseif($serviceName == "landing")
+  acl host_${endpointName}_${serviceName} hdr_beg(host) -i kodokojo.io
 #else##
-  acl host_${endpointName}_${serviceName} hdr_beg(host) -i ${serviceName}-${endpointName}
+  acl host_${endpointName}_${serviceName} hdr_beg(host) -i ${serviceName}-${endpointName}.kodokojo.io
 #end##
 #end
 ##

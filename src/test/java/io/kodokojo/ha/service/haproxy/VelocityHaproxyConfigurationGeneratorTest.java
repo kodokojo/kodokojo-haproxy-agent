@@ -35,6 +35,21 @@ public class VelocityHaproxyConfigurationGeneratorTest {
             public Boolean exposeMesos() {
                 return null;
             }
+
+            @Override
+            public String haproxyTemplatePath() {
+                return "templates/haproxy.conf.vm";
+            }
+
+            @Override
+            public String adminLogin() {
+                return "admin";
+            }
+
+            @Override
+            public String adminPassword() {
+                return "admin";
+            }
         }, new RsyslogConfig() {
             @Override
             public String host() {

@@ -59,12 +59,14 @@ public class VelocityHaproxyConfigurationGenerator implements HaproxyConfigurati
         VelocityEngine ve = new VelocityEngine();
         ve.init(VE_PROPERTIES);
 
-        Template template = ve.getTemplate("templates/haproxy.conf.vm");
+        Template template = ve.getTemplate(applicationConfig.haproxyTemplatePath());
 
         VelocityContext context = new VelocityContext();
         context.put("rsyslogHost", rsyslogConfig.host());
         context.put("rsyslogPort", rsyslogConfig.port());
         context.put("envName", applicationConfig.env());
+        context.put("adminLogin", applicationConfig.adminLogin());
+        context.put("adminPassword", applicationConfig.adminPassword());
         context.put("endpoints", endpoints);
         context.put("services", services);
         context.put("initialSshPort", 10022);

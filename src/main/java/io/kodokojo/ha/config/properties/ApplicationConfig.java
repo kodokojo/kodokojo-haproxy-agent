@@ -13,4 +13,15 @@ public interface ApplicationConfig extends PropertyConfig {
 
     @Key(value = "expose.mesos", defaultValue = "true")
     Boolean exposeMesos();
+
+    @Key(value = "haproxy.template.path", defaultValue = "templates/haproxy.conf.vm")
+    String haproxyTemplatePath();
+
+    @Key(value = "app.admin.login")
+    String adminLogin();
+
+    @Key(value = "app.admin.password")
+    String adminPassword();
+
+
 }

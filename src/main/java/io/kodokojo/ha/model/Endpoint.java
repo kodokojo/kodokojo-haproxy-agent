@@ -20,7 +20,6 @@ public class Endpoint {
     @Expose
     private Set<Service> services;
 
-
     private final String certificate;
 
     public Endpoint(String name, int portIndex, Set<Service> services, String certificate) {

@@ -30,9 +30,12 @@ import static org.apache.commons.lang.StringUtils.isBlank;
 public class ZookeeperMarathonRootStateWatcher implements Watcher {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperMarathonRootStateWatcher.class);
-    public static final String MARATHON_STATE = "/marathon/state";
-    public static final String TASKS_PATH_BEGIN = MARATHON_STATE + "/task:";
-    public static final Pattern TASK_PATTERN = Pattern.compile("^\\/marathon\\/state\\/task:(.*)\\..*$");
+
+    private static final String MARATHON_STATE = "/marathon/state";
+
+    private static final String TASKS_PATH_BEGIN = MARATHON_STATE + "/task:";
+
+    private static final Pattern TASK_PATTERN = Pattern.compile("^\\/marathon\\/state\\/task:(.*)\\..*$");
 
     private final Set<String> appAndTasks;
 
