@@ -123,6 +123,7 @@ public class HaProxyPersistenceStateActor extends AbstractActor {
         if (stat == null) {
             int portIndex = generateNewPortIndex();
             zooKeeper.create(path, ("" + portIndex).getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            stat = zooKeeper.exists(path, watcher);
         }
         byte[] portData = zooKeeper.getData(KODOKOJO_PORT_INDEX, watcher, stat);
         int version = stat.getVersion();
