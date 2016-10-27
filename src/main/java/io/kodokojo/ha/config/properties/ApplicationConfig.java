@@ -23,5 +23,8 @@ public interface ApplicationConfig extends PropertyConfig {
     @Key(value = "app.admin.password")
     String adminPassword();
 
+    @Key(value = "ssl.wildcard" , defaultValue = "true")
+    Boolean useWildCardCertificat();
+
 
 }

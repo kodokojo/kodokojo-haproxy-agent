@@ -1,6 +1,7 @@
 package io.kodokojo.ha.service.haproxy;
 
-import com.google.gson.Gson;
+import io.kodokojo.ha.config.properties.ApplicationConfig;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -12,15 +13,18 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang.StringUtils.isBlank;
 
 public class DefaultHaproxyUpdater implements HaproxyUpdater {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultHaproxyUpdater.class);
 
-    private static final String CONFIGURATION_PATH = "/usr/local/etc/haproxy/haproxy.cfg";
-
     private static final String CERTIFICATES_PATH = "/usr/local/etc/haproxy/ssl/";
+
+    public static final String WILDCARD_CERTIFICATE_PATH = CERTIFICATES_PATH + "wildcard.pem";
+
+    private static final String CONFIGURATION_PATH = "/usr/local/etc/haproxy/haproxy.cfg";
 
     private static final String NEW_CONFIGURATION_PATH = "/usr/local/etc/haproxy/newHaproxy.cfg";
 
@@ -32,10 +36,13 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
 
     private static final String[] VALIDATE_NEW_CONFIGURATION_CMD_A = {"-f ", NEW_CONFIGURATION_PATH, "-c"};
 
+    private final ApplicationConfig applicationConfig;
 
-    public DefaultHaproxyUpdater() {
+    public DefaultHaproxyUpdater(ApplicationConfig applicationConfig) {
+        requireNonNull(applicationConfig, "applicationConfig must be defined.");
         checkOrCreate(CONFIGURATION_PATH);
         checkOrCreate(NEW_CONFIGURATION_PATH);
+        this.applicationConfig = applicationConfig;
     }
 
     @Override
@@ -146,21 +153,32 @@ public class DefaultHaproxyUpdater implements HaproxyUpdater {
         if (!sslDir.exists()) {
             sslDir.mkdirs();
         }
-        LOGGER.debug("Write certificate {}.", certificates.size());
-        for (Map.Entry<String, String> entry : certificates.entrySet()) {
-            String certificatePath = CERTIFICATES_PATH + entry.getKey();
-            File certificateFile = new File(certificatePath);
-            if (certificateFile.exists() && certificateFile.length() > 0) {
-                LOGGER.info("Certificate {} already exist, ignore rewrite.", certificatePath);
-            } else {
-                try {
-                    FileOutputStream outputStream = new FileOutputStream(certificatePath, false);
-                    IOUtils.write(entry.getValue(), outputStream);
-                    LOGGER.debug("Write certificate {}.", certificatePath);
-                    IOUtils.closeQuietly(outputStream);
-                } catch (IOException e) {
-                    LOGGER.error("Unable to write certificate {}: {}", certificatePath, e);
-                }
+        if (applicationConfig.useWildCardCertificat() && MapUtils.isNotEmpty(certificates)) {
+            Map.Entry<String, String> firstEntry = certificates.entrySet().iterator().next();
+            String certificatePath = WILDCARD_CERTIFICATE_PATH;
+            writeCertificateIfRequiered(certificatePath, firstEntry.getValue());
+
+        } else {
+            LOGGER.debug("Write certificate {}.", certificates.size());
+            for (Map.Entry<String, String> entry : certificates.entrySet()) {
+                String certificatePath = CERTIFICATES_PATH + entry.getKey();
+                writeCertificateIfRequiered(certificatePath, entry.getValue());
+            }
+        }
+    }
+
+    private void writeCertificateIfRequiered(String certificatePath, String content) {
+        File certificateFile = new File(certificatePath);
+        if (certificateFile.exists() && certificateFile.length() > 0) {
+            LOGGER.info("Certificate {} already exist, ignore rewrite.", certificatePath);
+        } else {
+            try {
+                FileOutputStream outputStream = new FileOutputStream(certificatePath, false);
+                IOUtils.write(content, outputStream);
+                LOGGER.debug("Write certificate {}.", certificatePath);
+                IOUtils.closeQuietly(outputStream);
+            } catch (IOException e) {
+                LOGGER.error("Unable to write certificate {}: {}", certificatePath, e);
             }
         }
     }

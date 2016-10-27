@@ -66,7 +66,7 @@ public class ServiceModule extends AbstractModule {
                 }
             };
         }
-        return  new DefaultHaproxyUpdater();
+        return  new DefaultHaproxyUpdater(applicationConfig);
     }
 
 }

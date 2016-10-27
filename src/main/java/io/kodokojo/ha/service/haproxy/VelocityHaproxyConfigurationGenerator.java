@@ -65,6 +65,9 @@ public class VelocityHaproxyConfigurationGenerator implements HaproxyConfigurati
         context.put("rsyslogHost", rsyslogConfig.host());
         context.put("rsyslogPort", rsyslogConfig.port());
         context.put("envName", applicationConfig.env());
+        if (applicationConfig.useWildCardCertificat()) {
+            context.put("sslWildCardCertificate", DefaultHaproxyUpdater.WILDCARD_CERTIFICATE_PATH);
+        }
         context.put("adminLogin", applicationConfig.adminLogin());
         context.put("adminPassword", applicationConfig.adminPassword());
         context.put("endpoints", endpoints);

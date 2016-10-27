@@ -50,6 +50,11 @@ public class VelocityHaproxyConfigurationGeneratorTest {
             public String adminPassword() {
                 return "admin";
             }
+
+            @Override
+            public Boolean useWildCardCertificat() {
+                return Boolean.TRUE;
+            }
         }, new RsyslogConfig() {
             @Override
             public String host() {
