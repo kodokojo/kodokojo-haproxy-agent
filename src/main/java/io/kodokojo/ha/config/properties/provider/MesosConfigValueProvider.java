@@ -117,16 +117,18 @@ public class MesosConfigValueProvider extends AbstarctStringPropertyValueProvide
                         String host = address.getAsJsonPrimitive("ip").getAsString();
                         int port = address.getAsJsonPrimitive("port").getAsInt();
 
-                        String url = "http://" + host + ":" + port;
+                        String url = "http://" + host + ":" + port + "/state";
                         Request request = new Request.Builder().url(url).build();
                         Response response = null;
                         try {
                             response = httpClient.newCall(request).execute();
+                            LOGGER.debug("Request url {} response : {}", url, response.toString());
                             if (response.code() == 307) {
                                 String mesosUrl = response.header("Location");
                                 if (StringUtils.isBlank(mesosUrl)) {
                                     LOGGER.error("Unable to define Mesos leader Url.");
                                 } else {
+                                    LOGGER.debug("Defined Mesos master url as {}", mesosUrl);
                                     return mesosUrl;
                                 }
                             }
