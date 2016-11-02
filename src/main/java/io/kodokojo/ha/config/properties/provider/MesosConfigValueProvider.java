@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.apache.commons.lang.StringUtils.isBlank;
 
@@ -26,9 +28,11 @@ public class MesosConfigValueProvider extends AbstarctStringPropertyValueProvide
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MesosConfigValueProvider.class);
 
+    public static final String MESOS_URL = "mesos.url";
+
     private static final String MESOS_PATH = "/mesos";
 
-    public static final String MESOS_URL = "mesos.url";
+    private static final Pattern MESOS_REDIRECT_PATTERN = Pattern.compile("//(.*):(\\d*)/master/state");
 
     private final ZooKeeper zooKeeper;
 
@@ -51,6 +55,8 @@ public class MesosConfigValueProvider extends AbstarctStringPropertyValueProvide
         }
         this.delegate = delegate;
         this.httpClient = new OkHttpClient();
+        this.httpClient.setFollowRedirects(false);
+        this.httpClient.setFollowSslRedirects(false);
         try {
             zooKeeper = new ZooKeeper(zookeeperUrl, 1000, this);
         } catch (IOException e) {
@@ -128,8 +134,16 @@ public class MesosConfigValueProvider extends AbstarctStringPropertyValueProvide
                                 if (StringUtils.isBlank(mesosUrl)) {
                                     LOGGER.error("Unable to define Mesos leader Url.");
                                 } else {
-                                    LOGGER.debug("Defined Mesos master url as {}", mesosUrl);
-                                    return mesosUrl;
+                                    Matcher matcher = MESOS_REDIRECT_PATTERN.matcher(mesosUrl);
+                                    if (matcher.matches()) {
+                                        host = matcher.group(1);
+                                        port = Integer.valueOf(matcher.group(2));
+                                    } else if (LOGGER.isDebugEnabled()) {
+                                        LOGGER.debug("Unable to match regexp for redirect {}.", mesosUrl);
+                                    }
+
+                                    LOGGER.debug("Defined Mesos master url as {}:{} from a redirect information.", host, port);
+
                                 }
                             }
                         } catch (IOException e) {
