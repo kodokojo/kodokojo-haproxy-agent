@@ -30,7 +30,7 @@ backend ${endpointName}-${serviceName}-cluster-http
 #end##
 #macro(backendServiceWSS $endpointName $serviceName $services)##
 backend ${endpointName}-${serviceName}-cluster-wss
-  balance roundrobin
+  balance source
   # websocket protocol validation
   acl hdr_connection_upgrade hdr(Connection)                 -i upgrade
   acl hdr_upgrade_websocket  hdr(Upgrade)                    -i websocket
@@ -244,6 +244,16 @@ frontend http-in
 #frontProjectHTTP($endpoint)##
 #end##
 
+  acl host_${envName}_es hdr_beg(host) -i es-${envName}
+  acl host_${envName}_kibana hdr_beg(host) -i kibana-${envName}
+  acl host_${envName}_sensu hdr_beg(host) -i sensu-${envName}
+  acl host_${envName}_uchiwa hdr_beg(host) -i uchiwa-${envName}
+
+  use_backend es-${envName}-cluster-http if host_${envName}_es
+  use_backend kibana-${envName}-cluster-http if host_${envName}_kibana
+  use_backend sensu-${envName}-cluster-http if host_${envName}_sensu
+  use_backend uchiwa-${envName}-cluster-http if host_${envName}_uchiwa
+
 frontend https-in
   log     global
   mode    http
@@ -261,6 +271,11 @@ frontend https-in
   acl hdr_connection_upgrade hdr(Connection)  -i upgrade
   acl hdr_upgrade_websocket  hdr(Upgrade)     -i websocket
 
+  acl host_${envName}_es hdr_beg(host) -i es-${envName}
+  acl host_${envName}_kibana hdr_beg(host) -i kibana-${envName}
+  acl host_${envName}_sensu hdr_beg(host) -i sensu-${envName}
+  acl host_${envName}_uchiwa hdr_beg(host) -i uchiwa-${envName}
+
 #foreach($endpoint in $endpoints)##
 #aclProjectWSS($endpoint)##
 #end##
@@ -276,6 +291,12 @@ frontend https-in
 #foreach($endpoint in $endpoints)##
 #aclProjectOther($endpoint)##
 #end##
+
+use_backend es-${envName}-cluster-http if host_${envName}_es
+use_backend kibana-${envName}-cluster-http if host_${envName}_kibana
+use_backend sensu-${envName}-cluster-http if host_${envName}_sensu
+use_backend uchiwa-${envName}-cluster-http if host_${envName}_uchiwa
+
 ##  --- FRONTEND DECLARARTION
 #foreach($endpoint in $endpoints)##
 #frontProjectWSS($endpoint)##
@@ -293,6 +314,8 @@ frontend https-in
 #frontProjectTCP($endpoint)##
 #end##
 
+
+
 listen stats
   mode http
   bind  *:1983
@@ -303,7 +326,12 @@ listen stats
   stats show-node
   stats auth ${adminLogin}:${adminPassword}
 
+userlist userForOperators
+user ${adminLogin} insecure-password ${adminPassword}
+
 # ------- Backend
+
+
 
  #foreach($endpoint in $endpoints)##
  #backendProjectHTTPS($endpoint)##
@@ -320,3 +348,35 @@ listen stats
  #foreach($endpoint in $endpoints)##
  #backendProjectTCP("OTHER" $endpoint)##
  #end##
+
+backend es-${envName}-cluster-http
+  mode    http
+  redirect scheme https if !{ ssl_fc }
+  acl AuthUserForEs http_auth(userForOperators)
+  http-request auth realm ES if !AuthUserForEs
+  balance leastconn
+  server es-${envName}-http-0 es.${envName}.kodokojo.prv:9200 check
+
+backend kibana-${envName}-cluster-http
+  mode    http
+  redirect scheme https if !{ ssl_fc }
+  acl AuthUserForKibana http_auth(userForOperators)
+  http-request auth realm Kibana if !AuthUserForKibana
+  balance leastconn
+  server kibana-${envName}-http-0 es.${envName}.kodokojo.prv:5601 check
+
+backend sensu-${envName}-cluster-http
+  mode    http
+  redirect scheme https if !{ ssl_fc }
+  acl AuthUserForSensu http_auth(userForOperators)
+  http-request auth realm Sensu if !AuthUserForSensu
+  balance leastconn
+  server sensu-${envName}-http-0 sensu.${envName}.kodokojo.prv:4567 check
+
+backend uchiwa-${envName}-cluster-http
+  mode    http
+  redirect scheme https if !{ ssl_fc }
+  acl AuthUserForUchiwa http_auth(userForOperators)
+  http-request auth realm Uchiwa if !AuthUserForUchiwa
+  balance leastconn
+  server uchiwa-${envName}-http-0 sensu.${envName}.kodokojo.prv:3000 check
